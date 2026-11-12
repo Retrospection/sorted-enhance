@@ -98,7 +98,7 @@ final class PlannerRecovery: ObservableObject {
             var replica = try await files.prepare(snapshot: snapshot, folder: folder)
             let merged = try replica.document.snapshot()
             guard folder == syncFolder, store.snapshot == snapshot else { refresh(); return }
-            if merged != snapshot, !store.restore(merged) { throw RecoveryError.restoreFailed }
+            if merged != snapshot, !store.applySyncedSnapshot(merged) { throw RecoveryError.restoreFailed }
             replica.baseline = merged
             try await files.store(replica, folder: folder)
             try await files.publish(replica, folder: folder)

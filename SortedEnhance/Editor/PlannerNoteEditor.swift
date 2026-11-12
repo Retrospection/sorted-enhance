@@ -4,7 +4,7 @@ import SwiftUI
 struct PlannerNoteEditor: View {
     @Binding var notes: String
     @Binding var richNotes: Data?
-    var onExtract: (([String]) -> Void)?
+    var extractedTitles: Binding<[String]>?
 
     @StateObject private var session = NoteSession()
 
@@ -25,8 +25,8 @@ struct PlannerNoteEditor: View {
                     Image(systemName: "checklist")
                 }
                 .accessibilityLabel("Toggle checklist item").help("Toggle checklist item")
-                if let onExtract {
-                    Button("Extract lines") { session.extractLines(onExtract) }
+                if let extractedTitles {
+                    Button("Extract lines") { session.extractLines(into: extractedTitles) }
                         .help("Turn selected note lines into tasks when you save")
                 }
             }
@@ -77,16 +77,31 @@ private final class NoteSession: ObservableObject {
         view.insertText(marker, replacementRange: range)
     }
 
-    func extractLines(_ extract: ([String]) -> Void) {
-        guard let view = textView else { return }
+    func extractLines(into pending: Binding<[String]>) {
+        guard let view = textView, let undo = view.undoManager else { return }
         let text = view.string as NSString
         let range = text.lineRange(for: view.selectedRange())
         let titles = text.substring(with: range).components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         guard !titles.isEmpty else { return }
+        view.window?.makeFirstResponder(view)
+        view.breakUndoCoalescing()
+        undo.beginUndoGrouping()
         view.insertText("", replacementRange: range)
-        extract(titles)
+        view.breakUndoCoalescing()
+        setTitles(pending.wrappedValue + titles, in: pending, undo: undo)
+        undo.setActionName("Extract Lines")
+        undo.endUndoGrouping()
+    }
+
+    private func setTitles(_ titles: [String], in pending: Binding<[String]>, undo: UndoManager) {
+        let previous = pending.wrappedValue
+        undo.registerUndo(withTarget: self) { [weak undo] session in
+            guard let undo else { return }
+            session.setTitles(previous, in: pending, undo: undo)
+        }
+        pending.wrappedValue = titles
     }
 }
 

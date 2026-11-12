@@ -103,6 +103,7 @@ struct TaskEditorView: View {
                 draft.id = UUID()
                 draft.seriesID = nil
                 draft.occurrenceIndex = nil
+                draft.revisionDefaults = nil
                 draft.recurrence = nil
                 repeatScope = .occurrence
                 draft.status = .active

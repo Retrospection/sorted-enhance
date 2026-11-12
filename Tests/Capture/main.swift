@@ -30,3 +30,37 @@ precondition(PlannerAlert(task, now: now) == nil)
 task.status = .active
 task.deleted = true
 precondition(PlannerAlert(task, now: now) == nil)
+
+var utc = Calendar(identifier: .gregorian)
+utc.timeZone = TimeZone(secondsFromGMT: 0)!
+let monday = utc.date(from: DateComponents(year: 2026, month: 6, day: 1, hour: 10))!
+let beforeMonday = monday.addingTimeInterval(-3600)
+var recurring = PlannerItem(title: "Morning review")
+recurring.start = monday
+recurring.recurrence = PlannerRecurrence(frequency: .daily, anchor: monday, timeZone: utc.timeZone)
+recurring.seriesID = recurring.id
+recurring.occurrenceIndex = 0
+recurring.reminderOffsetMinutes = 15
+let dailyAlerts = PlannerAlert.plan(for: [recurring], now: beforeMonday)
+precondition(dailyAlerts.count == 1)
+let dailyAlert = dailyAlerts[0]
+let dailyTrigger = dailyAlert.request.trigger as! UNCalendarNotificationTrigger
+precondition(dailyTrigger.repeats && dailyTrigger.dateComponents.hour == 9 && dailyTrigger.dateComponents.minute == 45)
+precondition(dailyAlert.matches(dailyAlert.request))
+
+var skipped = recurring
+skipped.id = UUID()
+skipped.start = utc.date(byAdding: .day, value: 1, to: monday)
+skipped.occurrenceIndex = 1
+skipped.status = .canceled
+let adjusted = PlannerAlert.plan(for: [recurring, skipped], now: beforeMonday)
+precondition(adjusted.allSatisfy { $0.repeatingComponents == nil })
+precondition(!adjusted.contains { $0.date == skipped.start!.addingTimeInterval(-900) })
+precondition(adjusted.contains { $0.date == utc.date(byAdding: .day, value: 20, to: monday)!.addingTimeInterval(-900) })
+
+let delayed = PlannerAlert.plan(for: [recurring], now: beforeMonday.addingTimeInterval(-5 * 86400))
+precondition(delayed.allSatisfy { $0.repeatingComponents == nil && $0.date >= monday.addingTimeInterval(-900) })
+recurring.recurrence?.interval = 2
+let alternate = PlannerAlert.plan(for: [recurring], now: beforeMonday)
+precondition(alternate.contains { $0.date == monday.addingTimeInterval(12 * 86400 - 900) })
+precondition(!alternate.contains { $0.date == monday.addingTimeInterval(11 * 86400 - 900) })

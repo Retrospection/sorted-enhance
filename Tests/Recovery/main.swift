@@ -74,3 +74,54 @@ do {
     let intact = try await sync(removed, first)
     precondition(intact == removed)
 }
+
+// Both commits edit one schedule. The later tie breaker changes only Monday's time.
+var monday = PlannerItem(title: "Morning review")
+monday.day = Date(timeIntervalSince1970: 345600)
+monday.start = monday.day!.addingTimeInterval(32400)
+let mondayPlan = PlannerSnapshot(items: [monday])
+var mondayLater = monday
+mondayLater.start = monday.start!.addingTimeInterval(3600)
+var tuesday = monday
+tuesday.day = monday.day!.addingTimeInterval(86400)
+tuesday.start = monday.start!.addingTimeInterval(86400)
+let firstWriter = UUID(uuidString: "00000000-0000-4000-8000-000000000001")!
+let secondWriter = UUID(uuidString: "00000000-0000-4000-8000-000000000002")!
+var earlier = SyncDocument()
+try earlier.record(mondayPlan, after: PlannerSnapshot(), writer: firstWriter)
+var later = earlier
+try earlier.record(PlannerSnapshot(items: [tuesday]), after: mondayPlan, writer: firstWriter)
+try later.record(PlannerSnapshot(items: [mondayLater]), after: mondayPlan, writer: secondWriter)
+let beforeMerge = later
+later.merge(earlier)
+earlier.merge(beforeMerge)
+let forward = try earlier.snapshot()
+let backward = try later.snapshot()
+precondition(forward == backward && forward.items == [mondayLater], "Mixed dates after concurrent scheduling")
+
+// Keep changes received between opening the editor and saving its local draft.
+let library = PlannerStore(fileURL: temporary.appending(path: "editor/library.json"))
+precondition(library.save(monday))
+let opening = library.items[0]
+var draft = opening
+draft.title = "Local title"
+var withAttachment = opening
+withAttachment.attachments = [attachment]
+var incoming = library.snapshot
+incoming.items = [withAttachment, PlannerItem(title: "Remote task")]
+precondition(library.applySyncedSnapshot(incoming))
+precondition(!library.undo() && !library.redo())
+let updated = try PlannerItemEdit.reconcile(draft, opening: opening, current: library.items[0])
+precondition(library.save(updated))
+let saved = try await sync(library.snapshot, first)
+precondition(saved.items.contains { $0.id == opening.id && $0.title == "Local title" && $0.attachments == [attachment] })
+precondition(saved.items.contains { $0.id == incoming.items[1].id })
+precondition(library.undo())
+precondition(library.items[0].title == opening.title && library.items[0].attachments == [attachment])
+precondition(library.items.contains { $0.id == incoming.items[1].id })
+var remoteRename = opening
+remoteRename.title = "Another title"
+do {
+    _ = try PlannerItemEdit.reconcile(draft, opening: opening, current: remoteRename)
+    fatalError("A concurrent title edit must not be overwritten.")
+} catch PlannerEditError.conflict {}

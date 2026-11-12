@@ -7,6 +7,14 @@ struct PlannerAlert: Equatable {
     let identifier: String
     let title: String
     let date: Date
+    let repeatingComponents: DateComponents?
+
+    private init(identifier: String, title: String, date: Date, repeatingComponents: DateComponents? = nil) {
+        self.identifier = identifier
+        self.title = title
+        self.date = date
+        self.repeatingComponents = repeatingComponents
+    }
 
     init?(_ item: PlannerItem, now: Date) {
         guard !item.deleted, item.status == .active, let start = item.start,
@@ -16,6 +24,7 @@ struct PlannerAlert: Equatable {
         identifier = Self.prefix + item.id.uuidString
         title = item.title
         date = fireDate
+        repeatingComponents = nil
     }
 
     var request: UNNotificationRequest {
@@ -25,16 +34,104 @@ struct PlannerAlert: Equatable {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let instant = calendar.dateComponents([.calendar, .timeZone, .year, .month, .day, .hour, .minute, .second], from: date)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: instant, repeats: false)
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: repeatingComponents ?? instant,
+            repeats: repeatingComponents != nil
+        )
         return UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
     }
 
     func matches(_ existing: UNNotificationRequest) -> Bool {
         guard existing.content.title == title,
-              let trigger = existing.trigger as? UNCalendarNotificationTrigger,
-              let delivery = trigger.nextTriggerDate() else { return false }
+              let trigger = existing.trigger as? UNCalendarNotificationTrigger else { return false }
+        if let repeatingComponents {
+            return trigger.repeats && trigger.dateComponents == repeatingComponents
+        }
+        guard !trigger.repeats, let delivery = trigger.nextTriggerDate() else { return false }
         return floor(delivery.timeIntervalSince1970) == floor(date.timeIntervalSince1970)
     }
+
+    static func plan(for items: [PlannerItem], now: Date) -> [PlannerAlert] {
+        var explicit = items.filter { $0.seriesID == nil }.compactMap { PlannerAlert($0, now: now) }
+        var projected: [PlannerAlert] = []
+        let series = Dictionary(grouping: items.filter { $0.seriesID != nil }, by: \.seriesID)
+        let requestBudget = 64
+        for members in series.values {
+            var alerts = members.compactMap { PlannerAlert($0, now: now) }
+            guard let tail = members.max(by: { ($0.occurrenceIndex ?? 0) < ($1.occurrenceIndex ?? 0) }),
+                  let rule = tail.recurrence, let seriesID = tail.seriesID, tail.start != nil,
+                  let offset = tail.reminderOffsetMinutes, offset >= 0,
+                  let next = rule.firstIndex(after: now.addingTimeInterval(Double(offset) * 60)) else {
+                explicit += alerts
+                continue
+            }
+            let startIndex = rule.revisionIndex ?? rule.anchorIndex
+            let index = max(next, startIndex)
+            guard let first = rule.date(at: index) else { explicit += alerts; continue }
+            let firstFire = first.addingTimeInterval(-Double(offset) * 60)
+            let revision = members.filter { ($0.occurrenceIndex ?? -1) >= startIndex }
+            // A repeating notification has no start boundary or exception dates.
+            // Use it only if its very next delivery and every known occurrence agree.
+            let prefix = Self.prefix + "series." + seriesID.uuidString
+            if let pattern = repeatPattern(rule, offset: offset, firstFire: firstFire, now: now),
+               revision.allSatisfy({ item in
+                   guard let i = item.occurrenceIndex, let expected = rule.date(at: i) else { return false }
+                   let expectedFire = expected.addingTimeInterval(-Double(offset) * 60)
+                   let actual = PlannerAlert(item, now: now)
+                   if expectedFire <= now { return actual == nil }
+                   return actual?.date == expectedFire && actual?.title == tail.title
+               }) {
+                let covered = Set(revision.map { Self.prefix + $0.id.uuidString })
+                alerts.removeAll { covered.contains($0.identifier) }
+                explicit.append(PlannerAlert(identifier: prefix, title: tail.title, date: firstFire, repeatingComponents: pattern))
+            } else {
+                let occupied = Set(revision.compactMap(\.occurrenceIndex))
+                for step in 0..<requestBudget {
+                    let (i, overflow) = index.addingReportingOverflow(step)
+                    guard !overflow, let start = rule.date(at: i) else { break }
+                    if occupied.contains(i) { continue }
+                    projected.append(PlannerAlert(identifier: prefix + "." + String(i), title: tail.title,
+                                                  date: start.addingTimeInterval(-Double(offset) * 60)))
+                }
+            }
+            explicit += alerts
+        }
+        projected.sort { $0.date < $1.date }
+        explicit += projected.prefix(max(0, requestBudget - explicit.count))
+        return explicit
+    }
+
+    private static func repeatPattern(
+        _ rule: PlannerRecurrence, offset: Int, firstFire: Date, now: Date
+    ) -> DateComponents? {
+        guard rule.interval == 1 else { return nil }
+        let calendar = rule.calendar
+        let fire = rule.anchor.addingTimeInterval(-Double(offset) * 60)
+        var units: Set<Calendar.Component> = [.hour, .minute, .second, .timeZone]
+        // If the offset crosses a day boundary, a DST transition can change its wall-clock time.
+        guard calendar.isDate(fire, inSameDayAs: rule.anchor) else { return nil }
+        if calendar.timeZone.nextDaylightSavingTimeTransition(after: now) != nil,
+           calendar.component(.hour, from: fire) < 4 { return nil }
+        switch rule.frequency {
+        case .daily: break
+        case .weekly: units.insert(.weekday)
+        case .monthly:
+            guard calendar.component(.day, from: rule.anchor) <= 28 else { return nil }
+            units.insert(.day)
+        case .yearly:
+            if calendar.component(.month, from: rule.anchor) == 2 && calendar.component(.day, from: rule.anchor) == 29 {
+                return nil
+            }
+            units.formUnion([.month, .day])
+        }
+        var pattern = calendar.dateComponents(units, from: fire)
+        pattern.calendar = calendar
+        guard let nextFire = calendar.nextDate(after: now, matching: pattern, matchingPolicy: .strict),
+              floor(nextFire.timeIntervalSince1970) == floor(firstFire.timeIntervalSince1970)
+        else { return nil }
+        return pattern
+    }
+
 }
 
 @MainActor
@@ -63,7 +160,7 @@ final class PlannerNotifications: NSObject, UNUserNotificationCenterDelegate {
     func update(_ items: [PlannerItem]) {
         center.delegate = self
         let now = Date()
-        desiredAlerts = items.compactMap { PlannerAlert($0, now: now) }
+        desiredAlerts = PlannerAlert.plan(for: items, now: now)
         scheduleRefresh()
     }
 
@@ -83,7 +180,7 @@ final class PlannerNotifications: NSObject, UNUserNotificationCenterDelegate {
     private func reconcile(_ candidates: [PlannerAlert]) async {
         let pending = await center.pendingNotificationRequests()
         let now = Date()
-        let alerts = candidates.filter { $0.date > now }
+        let alerts = candidates.filter { $0.repeatingComponents != nil || $0.date > now }
         let desired = Dictionary(uniqueKeysWithValues: alerts.map { ($0.identifier, $0) })
         var unchanged: Set<String> = []
         var obsolete: [String] = []

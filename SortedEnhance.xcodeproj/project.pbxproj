@@ -18,7 +18,7 @@
             projectRoot = "";
             targets = (A172CEDCAE47474B615C54D5 /* app */, 534841524500000000000001, 574944474554000000000001, 000000000000000000000011);
         };
-        4813494D137E1631BBA301D5 /* root */ = { isa = PBXGroup; children = (26528A5FC3CFAE9924D0FA33 /* sourceGroup */, 534841524500000000000002, 534841524500000000000003, 574944474554000000000002, 574944474554000000000004, 000000000000000000000012, 0A3E27B8CA818264D75C8D81 /* products */); sourceTree = "<group>"; };
+        4813494D137E1631BBA301D5 /* root */ = { isa = PBXGroup; children = (26528A5FC3CFAE9924D0FA33 /* sourceGroup */, 534841524500000000000002, 534841524500000000000003, 574944474554000000000002, 574944474554000000000020, 574944474554000000000021, 574944474554000000000022, 574944474554000000000004, 000000000000000000000012, 0A3E27B8CA818264D75C8D81 /* products */); sourceTree = "<group>"; };
         26528A5FC3CFAE9924D0FA33 /* sourceGroup */ = { isa = PBXFileSystemSynchronizedRootGroup; path = SortedEnhance; sourceTree = "<group>"; };
         0A3E27B8CA818264D75C8D81 /* products */ = { isa = PBXGroup; children = (A8792157CB4F27FB949C035F /* product */, 534841524500000000000004, 574944474554000000000003, 000000000000000000000013); name = Products; sourceTree = "<group>"; };
         A8792157CB4F27FB949C035F /* product */ = { isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SortedEnhance.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -156,8 +156,14 @@
         574944474554000000000002 = { isa = PBXFileSystemSynchronizedRootGroup; path = WidgetExtension; sourceTree = "<group>"; };
         574944474554000000000003 = { isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; path = PlannerWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
         574944474554000000000004 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortedEnhance/Widgets/WidgetSnapshot.swift; sourceTree = SOURCE_ROOT; };
+        574944474554000000000020 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortedEnhance/Core/PlannerSnapshot.swift; sourceTree = SOURCE_ROOT; };
+        574944474554000000000030 = { isa = PBXBuildFile; fileRef = 574944474554000000000020; };
+        574944474554000000000021 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortedEnhance/Core/PlannerRecurrence.swift; sourceTree = SOURCE_ROOT; };
+        574944474554000000000031 = { isa = PBXBuildFile; fileRef = 574944474554000000000021; };
+        574944474554000000000022 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortedEnhance/Recurrence/PlannerRepetition.swift; sourceTree = SOURCE_ROOT; };
+        574944474554000000000032 = { isa = PBXBuildFile; fileRef = 574944474554000000000022; };
         574944474554000000000005 = { isa = PBXBuildFile; fileRef = 574944474554000000000004; };
-        574944474554000000000006 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (574944474554000000000005); runOnlyForDeploymentPostprocessing = 0; };
+        574944474554000000000006 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (574944474554000000000005, 574944474554000000000032, 574944474554000000000031, 574944474554000000000030); runOnlyForDeploymentPostprocessing = 0; };
         574944474554000000000008 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
         574944474554000000000007 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
         574944474554000000000009 = { isa = XCConfigurationList; buildConfigurations = (57494447455400000000000A, 57494447455400000000000B); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };

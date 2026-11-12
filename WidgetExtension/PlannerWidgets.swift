@@ -54,11 +54,7 @@ struct TodayIntent: PlannerWidgetIntent {
     static let title: LocalizedStringResource = "Today"
 
     func entry(from snapshot: WidgetSnapshot, at date: Date) -> PlannerEntry {
-        let tasks = snapshot.tasks.filter { task in
-            guard let day = task.start ?? task.day else { return false }
-            return Calendar.current.isDate(day, inSameDayAs: date)
-        }.sorted { ($0.start ?? .distantFuture) < ($1.start ?? .distantFuture) }
-        return PlannerEntry(date: date, title: "Today", tasks: tasks)
+        PlannerEntry(date: date, title: "Today", tasks: snapshot.tasks(on: date))
     }
 }
 

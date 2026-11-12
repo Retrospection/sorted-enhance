@@ -97,6 +97,20 @@ final class PlannerStore: ObservableObject {
     }
 
     @discardableResult
+    func applySyncedSnapshot(_ merged: PlannerSnapshot) -> Bool {
+        // Timeline and collection order are explicit record fields. JSON array order
+        // can change in transit without representing a remote edit.
+        if Set(merged.items) == Set(items), Set(merged.folders) == Set(folders), Set(merged.lists) == Set(lists) {
+            return true
+        }
+        guard libraryIsReadable, write(merged) else { return false }
+        past.removeAll()
+        future.removeAll()
+        snapshot = merged
+        return true
+    }
+
+    @discardableResult
     func undo() -> Bool {
         guard let previous = past.last, write(previous) else { return false }
         past.removeLast()

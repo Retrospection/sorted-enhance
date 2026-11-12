@@ -28,7 +28,10 @@ struct SyncDocument: Codable, Equatable, Sendable {
             for id in Set(old.keys).union(new.keys) where old[id] != new[id] {
                 let original = old[id] ?? [:]
                 let updated = new[id] ?? [:]
-                for key in Set(original.keys).union(updated.keys) where original[key] != updated[key] {
+                let changed = group == "items"
+                    ? PlannerItemEdit.changedKeys(from: original, to: updated)
+                    : Set(original.keys).union(updated.keys).filter { original[$0] != updated[$0] }
+                for key in changed {
                     groups[group, default: [:]][id, default: [:]][key] =
                         Field(counter: clock, writer: writer, value: updated[key])
                 }

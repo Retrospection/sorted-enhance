@@ -18,13 +18,6 @@ struct PlannerCalendarEvent: Identifiable, Hashable {
     let modified: Date?
     let alertMinutesBefore: Int?
 
-    fileprivate static func editableAlarm(in event: EKEvent) -> EKAlarm? {
-        event.alarms?.first { alarm in
-            alarm.absoluteDate == nil && alarm.proximity == .none && alarm.type == .display &&
-                alarm.relativeOffset <= 0 && Int(exactly: -alarm.relativeOffset / 60) != nil
-        }
-    }
-
     fileprivate init(_ event: EKEvent) {
         let calendar = event.calendar!
         calendarID = calendar.calendarIdentifier
@@ -41,7 +34,7 @@ struct PlannerCalendarEvent: Identifiable, Hashable {
         isWritable = calendar.allowsContentModifications
         notes = event.notes ?? ""
         modified = event.lastModifiedDate
-        alertMinutesBefore = Self.editableAlarm(in: event).flatMap { Int(exactly: -$0.relativeOffset / 60) }
+        alertMinutesBefore = EventAlerts.editable(in: event).first.flatMap { Int(exactly: -$0.relativeOffset / 60) }
     }
 }
 
@@ -183,10 +176,7 @@ final class SystemCalendarStore: ObservableObject {
             event.addRecurrenceRule(EKRecurrenceRule(recurrenceWith: frequency, interval: 1, end: nil))
         }
         if alertMinutesBefore != original?.alertMinutesBefore {
-            if let existing = PlannerCalendarEvent.editableAlarm(in: event) { event.removeAlarm(existing) }
-            if let minutes = alertMinutesBefore {
-                event.addAlarm(EKAlarm(relativeOffset: -TimeInterval(minutes) * 60))
-            }
+            EventAlerts.replace(in: event, minutesBefore: alertMinutesBefore)
         }
         try database.save(event, span: .thisEvent)
         let saved = PlannerCalendarEvent(event)

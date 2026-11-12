@@ -29,6 +29,7 @@ struct PlannerItem: Codable, Hashable, Identifiable, Sendable {
     var recurrence: PlannerRecurrence?
     var seriesID: UUID?
     var occurrenceIndex: Int?
+    var revisionDefaults: PlannerOccurrenceDefaults?
     var reminderOffsetMinutes: Int?
 }
 

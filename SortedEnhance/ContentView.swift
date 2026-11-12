@@ -116,7 +116,6 @@ struct ContentView: View {
                 scheduleDay = day
                 materialize(through: day)
             })
-
             .id(scheduleNavigation)
         } else if section == .collections && !isSearching {
             OrganizationView(store: store, onEdit: { editing = $0 }, initialListID: listToShow)

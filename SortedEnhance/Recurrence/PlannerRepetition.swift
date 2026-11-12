@@ -81,7 +81,9 @@ enum PlannerRepetition {
                     candidate >= lowerBound && !occupied.contains(candidate) &&
                         (upperBound.map { candidate < $0 } ?? true)
                 }
-                additions += occurrences(template, indices: indices)
+                if !indices.isEmpty, let source = rule.template(in: members) {
+                    additions += occurrences(source, indices: indices)
+                }
                 upperBound = lowerBound
             }
             return additions

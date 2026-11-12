@@ -4,9 +4,12 @@ import SwiftUI
 struct SortedEnhanceApp: App {
     @StateObject private var store = PlannerStore.shared
 
+    @StateObject private var recovery = PlannerRecovery(store: PlannerStore.shared)
+
     var body: some Scene {
         WindowGroup("Sorted Enhance") {
             ContentView(store: store)
+                .onAppear { recovery.refresh() }
         }
         .defaultSize(width: 960, height: 640)
         .commands {
@@ -18,6 +21,10 @@ struct SortedEnhanceApp: App {
                     .keyboardShortcut("z", modifiers: [.command, .option, .shift])
                     .disabled(!store.canRedo)
             }
+        }
+        Settings {
+            RecoveryView(recovery: recovery)
+                .frame(minWidth: 440, minHeight: 320)
         }
     }
 }

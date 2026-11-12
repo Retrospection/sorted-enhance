@@ -14,6 +14,7 @@ struct DailyScheduleView: View {
     @State private var showOrder = false
     @State private var showCalendars = false
     @State private var showScheduler = false
+    @State private var scheduleSelection: Set<UUID>?
     @State private var eventEditor: EventEditorRequest?
     @State private var notice: String?
 
@@ -111,7 +112,7 @@ struct DailyScheduleView: View {
                 let occupied = calendars.events(on: day)
                     .filter { !$0.isAllDay && $0.end > $0.start }
                     .map { DateInterval(start: $0.start, end: $0.end) }
-                let result = DayPlanner.plan(items: store.items, from: start, until: end, buffer: buffer, busy: occupied, defaultDuration: duration)
+                let result = DayPlanner.plan(items: store.items, from: start, until: end, buffer: buffer, busy: occupied, defaultDuration: duration, selectedIDs: scheduleSelection)
                 store.save(result.changes)
                 notice = result.overflowCount > 0 ? "\(result.overflowCount) tasks did not fit and have no start time." : nil
                 showOrder = false
@@ -153,7 +154,11 @@ struct DailyScheduleView: View {
         HStack {
             Button("New Task", systemImage: "plus") { onNew(day) }
             Button("New Event") { eventEditor = EventEditorRequest() }
-            Button("Auto Schedule") { showScheduler = true }
+            Button("Auto Schedule") {
+                scheduleSelection = nil
+                showScheduler = true
+            }
+            .help("Schedule all movable tasks on this day")
             Spacer()
             Picker("View", selection: $showOrder) {
                 Text("Timeline").tag(false)
@@ -239,6 +244,10 @@ struct DailyScheduleView: View {
     private var batchActions: some View {
         let items = selectedTasks
         return HStack {
+            Button("Schedule Selection") {
+                scheduleSelection = Set(items.map(\.id))
+                showScheduler = true
+            }
             CalendarDrawerButton(store: store, items: items)
             Menu("Time Ruler") {
                 ForEach([-60, -5, 5, 60], id: \.self) { amount in

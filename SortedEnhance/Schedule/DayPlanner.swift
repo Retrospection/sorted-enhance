@@ -34,11 +34,12 @@ enum DayPlanner {
         buffer: Int,
         busy: [DateInterval],
         defaultDuration: Int = standardDuration,
+        selectedIDs: Set<UUID>? = nil,
         calendar: Calendar = .current
     ) -> Result {
         let visible = self.items(on: start, in: items, defaultDuration: defaultDuration, calendar: calendar)
         let movable = visible.filter { item in
-            item.status == .active && !item.locked
+            item.status == .active && !item.locked && (selectedIDs?.contains(item.id) ?? true)
                 && item.start.map { calendar.isDate($0, inSameDayAs: start) } != false
         }
         let movingIDs = Set(movable.map(\.id))

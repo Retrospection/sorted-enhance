@@ -32,6 +32,15 @@ precondition(result.changes.map(\.id) == [outline.id, draft.id, finish.id])
 precondition(result.changes.map(\.start) == [date(8, 9, 30), date(8, 11, 30), nil])
 precondition(result.overflowCount == 1)
 
+let protectedTask = task("Keep this appointment", 45, order: 0, start: date(8, 9))
+let omitted = task("Unscheduled", 15, order: 3)
+let selectedResult = DayPlanner.plan(
+    items: [omitted, draft, outline, protectedTask, locked], from: date(8, 9), until: date(8, 13),
+    buffer: 0, busy: [], selectedIDs: [outline.id, draft.id, locked.id], calendar: calendar
+)
+precondition(selectedResult.changes.map(\.id) == [outline.id, draft.id])
+precondition(selectedResult.changes.map(\.start) == [date(8, 9, 45), date(8, 10, 15)])
+
 let overnight = task("Carry over", 90, order: 0, start: date(7, 23, 30))
 let midnight = DayPlanner.plan(items: [overnight, draft], from: date(8, 0), until: date(8, 4),
                                buffer: 0, busy: [], calendar: calendar)

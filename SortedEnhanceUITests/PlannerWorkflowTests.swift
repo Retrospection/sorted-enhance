@@ -112,6 +112,40 @@ final class PlannerWorkflowTests: XCTestCase {
         assertStart("13:00", for: outline)
     }
 
+    func testScheduleFormRemembersOnlyTheAppliedBuffer() {
+        app.launch()
+        navigate("Schedule")
+        _ = selectEmptyDay()
+        button("Auto Schedule").click()
+        guard let original = field("Buffer").value as? String else {
+            XCTFail("Could not read the existing buffer.")
+            return
+        }
+        let updated = original == "7" ? "8" : "7"
+        fill("Buffer", with: updated)
+        button("Apply").click()
+        addTeardownBlock { @MainActor in
+            self.app.terminate()
+            self.app.launch()
+            self.navigate("Schedule")
+            _ = self.selectEmptyDay()
+            self.button("Auto Schedule").click()
+            self.fill("Buffer", with: original)
+            self.button("Apply").click()
+        }
+
+        button("Auto Schedule").click()
+        XCTAssertEqual(field("Buffer").value as? String, updated)
+        fill("Buffer", with: "3")
+        button("Cancel").click()
+        app.terminate()
+        app.launch()
+        navigate("Schedule")
+        button("Auto Schedule").click()
+        XCTAssertEqual(field("Buffer").value as? String, updated)
+        button("Cancel").click()
+    }
+
     private func showDay(_ day: String) {
         fill("Schedule date", with: day)
         app.typeKey(.return, modifierFlags: [])

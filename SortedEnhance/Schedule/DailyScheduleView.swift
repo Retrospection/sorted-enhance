@@ -15,6 +15,7 @@ struct DailyScheduleView: View {
     @State private var dayInput: String
     @State private var selection: Set<String> = []
     @State private var showOrder = false
+    @State private var appliedPlanCount = 0
     @State private var showCalendars = false
     @State private var showDate = false
     @Binding private var showScheduler: Bool
@@ -119,8 +120,15 @@ struct DailyScheduleView: View {
                     Button("Dismiss") { self.notice = nil }.buttonStyle(.link)
                 }
             }
-            Group {
-                if showOrder { orderList } else { timelineList }
+            ScrollViewReader { scroll in
+                Group {
+                    if showOrder { orderList } else { timelineList }
+                }
+                .onChange(of: appliedPlanCount) {
+                    if let first = timeline.first {
+                        scroll.scrollTo(first.entry.id, anchor: .top)
+                    }
+                }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
@@ -172,6 +180,7 @@ struct DailyScheduleView: View {
                         notice = result.overflowCount > 0 ? "\(result.overflowCount) tasks did not fit and have no start time." : nil
                         showOrder = false
                         showScheduler = false
+                        appliedPlanCount += 1
                     }
                     .padding(.horizontal, 12)
                 }
@@ -338,6 +347,7 @@ struct DailyScheduleView: View {
                 .listRowSeparator(.hidden)
                 .contentShape(Rectangle())
                 .tag(row.entry.id)
+                .id(row.entry.id)
             }
         }
         .simultaneousGesture(MagnifyGesture().onEnded { gesture in

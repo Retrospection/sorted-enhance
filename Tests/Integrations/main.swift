@@ -14,3 +14,12 @@ for invalid in [
 ] {
     guard case nil = PlannerLink(url: URL(string: invalid)!) else { fatalError("Unexpected action for " + invalid) }
 }
+
+let calendar = Calendar.current
+let day = calendar.startOfDay(for: Date())
+for route in [PlannerLink.date(day), .list(id), .search("milk & tea + 50%?")] {
+    precondition(PlannerLink(url: route.url) == route)
+}
+for invalid in ["date/2026-02-30", "date/2026-1-1", "list/unknown", "search?q=A&q=B", "search?q=%20"] {
+    precondition(PlannerLink(url: URL(string: "sorted-enhance://" + invalid)!) == nil)
+}

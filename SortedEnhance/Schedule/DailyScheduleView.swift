@@ -6,6 +6,7 @@ struct DailyScheduleView: View {
     let onNew: (Date) -> Void
     let onDayChange: (Date) -> Void
 
+    @AppStorage("scheduleDefaultDuration") private var defaultDuration = DayPlanner.standardDuration
     @StateObject private var calendars = SystemCalendarStore()
     @State private var day: Date
     @State private var dayInput: String
@@ -56,16 +57,16 @@ struct DailyScheduleView: View {
             }
         }
 
-        var end: Date? {
+        func end(defaultDuration: Int) -> Date? {
             switch self {
-            case .task(let item): DayPlanner.end(of: item)
+            case .task(let item): DayPlanner.end(of: item, defaultDuration: defaultDuration)
             case .event(let event): event.isAllDay ? nil : event.end
             }
         }
     }
 
     private var dayTasks: [PlannerItem] {
-        DayPlanner.items(on: day, in: store.items).sorted { $0.order < $1.order }
+        DayPlanner.items(on: day, in: store.items, defaultDuration: defaultDuration).sorted { $0.order < $1.order }
     }
 
     private var selectedTasks: [PlannerItem] {
@@ -79,7 +80,7 @@ struct DailyScheduleView: View {
         var lastEnd: Date?
         return entries.map { entry in
             var gap: Int?
-            if let start = entry.start, let finish = entry.end {
+            if let start = entry.start, let finish = entry.end(defaultDuration: defaultDuration) {
                 if let lastEnd {
                     let boundary = min(lastEnd, finish)
                     gap = Int(start.timeIntervalSince(boundary) / 60)
@@ -106,11 +107,11 @@ struct DailyScheduleView: View {
         }
         .padding()
         .sheet(isPresented: $showScheduler) {
-            ScheduleForm(day: day) { start, end, buffer in
+            ScheduleForm(day: day) { start, end, buffer, duration in
                 let occupied = calendars.events(on: day)
                     .filter { !$0.isAllDay && $0.end > $0.start }
                     .map { DateInterval(start: $0.start, end: $0.end) }
-                let result = DayPlanner.plan(items: store.items, from: start, until: end, buffer: buffer, busy: occupied)
+                let result = DayPlanner.plan(items: store.items, from: start, until: end, buffer: buffer, busy: occupied, defaultDuration: duration)
                 store.save(result.changes)
                 notice = result.overflowCount > 0 ? "\(result.overflowCount) tasks did not fit and have no start time." : nil
                 showOrder = false
@@ -183,7 +184,7 @@ struct DailyScheduleView: View {
                                 Text(item.status == .completed ? "Completed" : "Canceled").font(.caption)
                             }
                             Spacer()
-                            Text("\(item.duration) min").foregroundStyle(.secondary)
+                            Text("\(DayPlanner.occupiedMinutes(item, defaultDuration: defaultDuration)) min").foregroundStyle(.secondary)
                         case .event(let event):
                             Image(systemName: "calendar")
                             Text(event.title)

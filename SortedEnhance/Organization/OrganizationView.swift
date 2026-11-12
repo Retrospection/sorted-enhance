@@ -34,6 +34,12 @@ struct OrganizationView: View {
     @State private var name = ""
     @State private var mergeError: String?
 
+    init(store: PlannerStore, onEdit: @escaping (PlannerItem) -> Void, initialListID: UUID? = nil) {
+        self.store = store
+        self.onEdit = onEdit
+        _filter = State(initialValue: initialListID.map(CollectionFilter.list) ?? .all)
+    }
+
     private var active: [PlannerItem] {
         store.items.filter { !$0.deleted && $0.status == .active }
     }

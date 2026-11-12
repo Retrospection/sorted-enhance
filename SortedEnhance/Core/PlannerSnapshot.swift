@@ -18,7 +18,8 @@ struct PlannerItem: Codable, Hashable, Identifiable, Sendable {
     var attachments: [PlannerAttachment]?
     var day: Date?
     var start: Date?
-    var duration = 30
+    var duration: Int?
+    var scheduledDuration: Int?
     var locked = false
     var status = PlannerStatus.active
     var deleted = false

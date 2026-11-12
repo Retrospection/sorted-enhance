@@ -40,6 +40,26 @@ Feature: Preserve data and verify the Mac reference
     Then each observed action has an input, steps, expected outcome and version in the parity record
     And each newly discovered behavior has a corresponding acceptance case or documented platform difference
 
+  @mac_inventory @settings_comparison @reference
+  Scenario Outline: Compare observed Mac settings on a disposable profile
+    Given Sorted³ 3.10 build 365 and the candidate each use a disposable Mac profile
+    When I open Settings, locate <control> and perform <action>
+    Then I record the result in each app after relaunch and any missing control
+
+    Examples:
+      | control                       | action                                                  |
+      | appearance                    | switch between system and explicit theme                |
+      | spacing and Inbox icon        | choose another value and inspect the sidebar and rows   |
+      | week start, 24-hour and lunar | change each date preference and inspect the calendar    |
+      | badge and overdue             | schedule a past task and inspect the badge              |
+      | notification and sound       | change the lead and snooze on a new test alert          |
+      | duration and time ruler       | set a default duration and reverse the ruler direction  |
+      | Calendars and Reminders       | select a disposable calendar and import a test reminder |
+      | iCloud and automatic backup   | enable each service and verify the fixture is captured  |
+      | passcode                      | set a test code and reopen the protected profile        |
+      | diagnostic export             | export a diagnostic file for the disposable profile     |
+      | tutorial tasks                | add the tutorial list and locate its example tasks      |
+
   @completion @reference
   Scenario: Reconcile each Issue 1 item against the Mac build
     Given the reference inventory and the candidate build identifier

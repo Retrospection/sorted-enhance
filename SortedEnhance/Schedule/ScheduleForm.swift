@@ -2,13 +2,15 @@ import SwiftUI
 
 struct ScheduleForm: View {
     var day: Date
-    var apply: (Date, Date, Int) -> Void
+    var apply: (Date, Date, Int, Int) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var from = ""
-    @State private var until = "24:00"
+    @State private var from = "09:00"
+    @State private var until = "23:55"
     @AppStorage("scheduleBuffer") private var buffer = 0
     @State private var bufferInput = ""
+    @AppStorage("scheduleDefaultDuration") private var defaultDuration = DayPlanner.standardDuration
+    @State private var durationInput = ""
 
     private func time(_ text: String) -> Date? {
         let parts = text.split(separator: ":")
@@ -23,10 +25,11 @@ struct ScheduleForm: View {
         return date
     }
 
-    private var input: (start: Date, end: Date, minutes: Int)? {
+    private var input: (start: Date, end: Date, buffer: Int, duration: Int)? {
         guard let start = time(from), let end = time(until), end > start,
-              let minutes = Int(bufferInput), (0...1440).contains(minutes) else { return nil }
-        return (start, end, minutes)
+              let minutes = Int(bufferInput), (0...1440).contains(minutes),
+              let duration = Int(durationInput), (1...1440).contains(duration) else { return nil }
+        return (start, end, minutes, duration)
     }
 
     var body: some View {
@@ -34,12 +37,14 @@ struct ScheduleForm: View {
             TextField("Schedule from", text: $from)
             TextField("Finish by", text: $until)
             TextField("Buffer", text: $bufferInput)
+            TextField("Default duration", text: $durationInput)
             HStack {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Apply") {
                     guard let input else { return }
-                    buffer = input.minutes
-                    apply(input.start, input.end, input.minutes)
+                    buffer = input.buffer
+                    defaultDuration = input.duration
+                    apply(input.start, input.end, input.buffer, input.duration)
                     dismiss()
                 }
                 .disabled(input == nil)
@@ -49,9 +54,7 @@ struct ScheduleForm: View {
         .frame(width: 260)
         .padding()
         .onAppear {
-            let now = Date()
-            let components = Calendar.current.dateComponents([.hour, .minute], from: now)
-            from = Calendar.current.isDateInToday(day) ? String(format: "%02d:%02d", components.hour ?? 9, components.minute ?? 0) : "09:00"
+            durationInput = String(defaultDuration)
             bufferInput = String(buffer)
         }
     }

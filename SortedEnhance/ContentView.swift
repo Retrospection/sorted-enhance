@@ -27,6 +27,8 @@ struct ContentView: View {
     @State private var search = ""
     @State private var editing: PlannerItem?
     @State private var quickCapture = false
+    @State private var listToShow: UUID?
+    @State private var listNavigation = UUID()
     @State private var scheduleDay = Date.now
     @StateObject private var calendars = SystemCalendarStore()
     @State private var eventToEdit: PlannerCalendarEvent?
@@ -112,7 +114,8 @@ struct ContentView: View {
             }, initialDay: scheduleDay, onDayChange: { materialize(through: $0) })
             .id(scheduleDay)
         } else if section == .collections && !isSearching {
-            OrganizationView(store: store, onEdit: { editing = $0 })
+            OrganizationView(store: store, onEdit: { editing = $0 }, initialListID: listToShow)
+                .id(listNavigation)
         } else {
             List(selection: $selectedTask) {
                 ForEach(visibleItems) { item in
@@ -167,14 +170,24 @@ struct ContentView: View {
 
     private func openLink(_ url: URL) {
         guard let link = PlannerLink(url: url) else { return }
+        editing = nil
+        quickCapture = false
+        eventToEdit = nil
+        search = ""
         switch link {
         case .today:
-            editing = nil
-            quickCapture = false
-            eventToEdit = nil
-            search = ""
             scheduleDay = .now
             section = .schedule
+        case .date(let day):
+            scheduleDay = day
+            section = .schedule
+        case .list(let id):
+            guard store.lists.contains(where: { $0.id == id }) else { return }
+            listToShow = id
+            listNavigation = UUID()
+            section = .collections
+        case .search(let query):
+            search = query
         case .item(let id):
             guard let item = store.items.first(where: { $0.id == id }) else { return }
             eventToEdit = nil

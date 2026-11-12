@@ -15,7 +15,7 @@ struct TaskEditorView: View {
         self.store = store
         _draft = State(initialValue: item)
         _timeText = State(initialValue: item.start.map(Self.formatTime) ?? "")
-        _durationText = State(initialValue: String(item.duration))
+        _durationText = State(initialValue: item.duration.map(String.init) ?? "")
     }
 
     var body: some View {
@@ -81,7 +81,7 @@ struct TaskEditorView: View {
                 TextField("Start time", text: $timeText, prompt: Text("HH:mm"))
                     .accessibilityLabel("Start time")
                 Toggle("Lock time", isOn: $draft.locked).disabled(timeText.isEmpty)
-                TextField("Duration", text: $durationText)
+                TextField("Duration", text: $durationText, prompt: Text("Auto"))
                     .accessibilityLabel("Duration")
                 Text("min")
             }
@@ -127,13 +127,20 @@ struct TaskEditorView: View {
             validationMessage = "Enter a title."
             return
         }
-        guard let minutes = Int(durationText), (1...1440).contains(minutes) else {
-            validationMessage = "Enter a duration from 1 to 1440 minutes."
-            return
+        let duration = durationText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if duration.isEmpty {
+            item.duration = nil
+        } else {
+            guard let minutes = Int(duration), (1...1440).contains(minutes) else {
+                validationMessage = "Enter a duration from 1 to 1440 minutes."
+                return
+            }
+            item.duration = minutes
+            item.scheduledDuration = nil
         }
-        item.duration = minutes
         if timeText.isEmpty {
             item.start = nil
+            item.scheduledDuration = nil
             item.reminderOffsetMinutes = nil
             item.locked = false
         } else {

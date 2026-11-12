@@ -47,4 +47,63 @@ let moved = DayPlanner.move([saturday, outline], to: date(8, 0), calendar: calen
 precondition(moved.map(\.start) == [date(8, 9), nil])
 precondition(moved.map(\.day) == [date(8, 0), date(8, 0)])
 
+@MainActor
+func testReplanAfterMeetingAndRelaunch() {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let file = directory.appending(path: "planner.json")
+    let store = PlannerStore(fileURL: file)
+    let outline = task("Outline", 30, order: 0)
+    let writing = task("Write", 60, order: 1)
+    let meeting = DateInterval(start: date(8, 14), end: date(8, 15))
+    precondition(store.save([outline, writing]))
+
+    let first = DayPlanner.plan(items: store.items, from: date(8, 13), until: date(8, 18),
+                                buffer: 0, busy: [meeting], calendar: calendar)
+    precondition(store.save(first.changes))
+    guard var completed = store.items.first(where: { $0.id == outline.id }) else {
+        preconditionFailure("Lost the outline during the initial schedule.")
+    }
+    precondition(completed.start == date(8, 13))
+    precondition(store.items.first { $0.id == writing.id }?.start == date(8, 15))
+
+    completed.status = .completed
+    precondition(store.save(completed))
+    let next = DayPlanner.plan(items: store.items, from: date(8, 15, 30), until: date(8, 18),
+                               buffer: 0, busy: [meeting], calendar: calendar)
+    precondition(store.save(next.changes))
+
+    let reopened = PlannerStore(fileURL: file)
+    precondition(reopened.items.count == 2)
+    precondition(reopened.items.first { $0.id == outline.id } == completed)
+    let remaining = reopened.items.first { $0.id == writing.id }
+    precondition(remaining?.status == .active && remaining?.start == date(8, 15, 30))
+}
+
+testReplanAfterMeetingAndRelaunch()
+func testDefaultDurationAndLegacyLibrary() throws {
+    let legacyJSON = """
+    {"items":[
+      {"id":"22DD9556-DD38-4340-8889-3CB44067C56F","title":"Read","notes":"","locked":false,
+       "status":"active","deleted":false,"tags":[],"order":0},
+      {"id":"AD828281-9AEA-4F0F-ADDF-4DCE42F2408B","title":"Call","notes":"","duration":30,"locked":false,
+       "status":"active","deleted":false,"tags":[],"order":1}
+    ],"folders":[],"lists":[]}
+    """
+    var items = try JSONDecoder().decode(PlannerSnapshot.self, from: Data(legacyJSON.utf8)).items
+    for index in items.indices { items[index].day = date(8, 0) }
+    let initial = DayPlanner.plan(items: items, from: date(8, 9), until: date(8, 10),
+                                  buffer: 0, busy: [], calendar: calendar).changes
+    precondition(initial.map(\.start) == [date(8, 9), date(8, 9, 15)])
+    precondition(initial.map(\.duration) == [nil, 30])
+    precondition(initial.map(\.scheduledDuration) == [15, nil])
+    let replanned = DayPlanner.plan(items: initial, from: date(8, 9), until: date(8, 10),
+                                    buffer: 0, busy: [], defaultDuration: 20, calendar: calendar).changes
+    precondition(replanned.map(\.start) == [date(8, 9), date(8, 9, 20)])
+    precondition(replanned.map(\.scheduledDuration) == [20, nil])
+    precondition(DayPlanner.end(of: replanned[0], defaultDuration: 5) == date(8, 9, 20))
+    precondition(DayPlanner.end(of: replanned[1], defaultDuration: 5) == date(8, 9, 50))
+}
+
+try testDefaultDurationAndLegacyLibrary()
 print("Day planner checks passed.")

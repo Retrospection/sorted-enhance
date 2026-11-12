@@ -10,6 +10,7 @@ struct SortedEnhanceApp: App {
     var body: some Scene {
         Window("Sorted Enhance", id: "planner") {
             ContentView(store: store)
+                .modifier(PlannerPreferencesModifier())
                 .onAppear { recovery.refresh() }
         }
         .defaultSize(width: 960, height: 640)
@@ -24,8 +25,12 @@ struct SortedEnhanceApp: App {
             }
         }
         Settings {
-            RecoveryView(recovery: recovery)
-                .frame(minWidth: 440, minHeight: 320)
+            TabView {
+                GeneralPreferencesView().tabItem { Label("General", systemImage: "gearshape") }
+                RecoveryView(recovery: recovery).tabItem { Label("Data", systemImage: "externaldrive") }
+            }
+            .modifier(PlannerPreferencesModifier())
+            .frame(minWidth: 470, minHeight: 360)
         }
     }
 }

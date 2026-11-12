@@ -99,7 +99,7 @@ struct CalendarEventEditor: View {
         .onAppear {
             do {
                 if let event = original {
-                    annotation = try EventAnnotation.load(for: event)
+                    annotation = try store.annotation(for: event)
                     loadedAnnotation = annotation
                 }
                 annotationLoaded = true
@@ -146,9 +146,13 @@ struct CalendarEventEditor: View {
                 original = try store.save(original, title: title, start: start, end: end, allDay: allDay,
                                           calendarID: calendarID, notes: notes, repeatFrequency: repeatFrequency)
             }
-            if let event = original, annotation != loadedAnnotation || event.id != annotationOwner?.id {
-                try annotation.write(for: event)
-                if let annotationOwner, annotationOwner.id != event.id { try EventAnnotation().write(for: annotationOwner) }
+            if let event = original, annotation != loadedAnnotation || event.annotationIdentity != annotationOwner?.annotationIdentity {
+                let files = try EventAnnotationStore.applicationStore()
+                try files.write(annotation, for: event.annotationIdentity)
+                if let previous = annotationOwner?.annotationIdentity,
+                   files.record(for: previous) != files.record(for: event.annotationIdentity) {
+                    try files.write(EventAnnotation(), for: previous)
+                }
                 loadedAnnotation = annotation
                 annotationOwner = event
             }
@@ -159,7 +163,7 @@ struct CalendarEventEditor: View {
     private func remove(_ event: PlannerCalendarEvent) {
         do {
             try store.delete(event)
-            try EventAnnotation().write(for: event)
+            try EventAnnotationStore.applicationStore().write(EventAnnotation(), for: event.annotationIdentity)
             dismiss()
         } catch { self.error = error.localizedDescription }
     }

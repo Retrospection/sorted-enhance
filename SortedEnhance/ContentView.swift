@@ -73,7 +73,7 @@ struct ContentView: View {
         .searchable(text: $search, placement: .toolbar, prompt: "Search tasks and events")
         .onChange(of: section) { search = "" }
         .onChange(of: search) { searchEvents = calendars.search(search) }
-        .onReceive(calendars.$calendars) { _ in searchEvents = calendars.search(search) }
+        .onReceive(calendars.$calendars.receive(on: RunLoop.main)) { _ in searchEvents = calendars.search(search) }
         .sheet(item: $eventToEdit) { event in
             CalendarEventEditor(store: calendars, day: event.start, event: event)
         }
@@ -99,8 +99,11 @@ struct ContentView: View {
                 var item = PlannerItem(title: "")
                 item.day = day
                 editing = item
-            }, initialDay: scheduleDay, onDayChange: { materialize(through: $0) })
-            .id(scheduleDay)
+            }, initialDay: scheduleDay, onDayChange: { day in
+                scheduleDay = day
+                materialize(through: day)
+            })
+
         } else if section == .collections && !isSearching {
             OrganizationView(store: store, onEdit: { editing = $0 })
         } else {
@@ -120,6 +123,7 @@ struct ContentView: View {
                     .tag(item.id)
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) { editing = item }
+                    .accessibilityElement(children: .contain)
                     .accessibilityAction { editing = item }
                     .contextMenu { Button("Open") { editing = item } }
                 }
@@ -128,6 +132,7 @@ struct ContentView: View {
                         Label(event.title, systemImage: "calendar")
                             .contentShape(Rectangle())
                             .onTapGesture(count: 2) { eventToEdit = event }
+                            .accessibilityElement(children: .contain)
                             .accessibilityAction { eventToEdit = event }
                     }
                 }

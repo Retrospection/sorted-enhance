@@ -31,9 +31,7 @@ struct TaskEditorView: View {
                     if !timeText.isEmpty {
                         TaskAlertPicker(item: $draft)
                     }
-                    PlannerNoteEditor(notes: $draft.notes, richNotes: $draft.richNotes) {
-                        extractedTitles.append(contentsOf: $0)
-                    }
+                    PlannerNoteEditor(notes: $draft.notes, richNotes: $draft.richNotes, extractedTitles: $extractedTitles)
                     if !extractedTitles.isEmpty {
                         Text("New tasks: " + extractedTitles.joined(separator: ", ")).font(.callout)
                     }

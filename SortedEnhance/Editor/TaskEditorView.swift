@@ -127,11 +127,18 @@ struct TaskEditorView: View {
             HStack(spacing: 12) {
                 if openingItem?.id == draft.id { actions }
                 Spacer(minLength: 4)
-                Button { draft.locked.toggle() } label: {
+                Toggle(isOn: $draft.locked) {
                     Image(systemName: draft.locked ? "lock.fill" : "lock.open")
                 }
-                .disabled(timeText.isEmpty).accessibilityLabel("Lock time")
-                .accessibilityValue(draft.locked ? "On" : "Off").help("Lock time")
+                .toggleStyle(.button)
+                .buttonStyle(.plain)
+                .accessibilityRepresentation {
+                    Toggle("Lock time", isOn: $draft.locked)
+                        .toggleStyle(.checkbox)
+                        .accessibilityIdentifier("Lock time")
+                }
+                .disabled(timeText.isEmpty)
+                .help("Lock time")
                 Button("Save") { save(draft) }
                     .buttonStyle(.borderedProminent).buttonBorderShape(.capsule)
                     .keyboardShortcut(.defaultAction)

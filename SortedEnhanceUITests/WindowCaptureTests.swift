@@ -36,7 +36,39 @@ final class WindowCaptureTests: XCTestCase {
         title.typeText("Review proposal")
         XCTAssertEqual(title.value as? String, "Review proposal")
         attach(planner, named: "TaskEditor")
-        app.buttons["Close"].click()
+        app.buttons["Save"].click()
+        let task = planner.staticTexts["Review proposal"]
+        XCTAssertTrue(task.waitForExistence(timeout: 5))
+        attach(planner, named: "PopulatedInbox")
+
+        let complete = planner.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "InboxComplete-")).firstMatch
+        XCTAssertTrue(complete.waitForExistence(timeout: 5))
+        complete.click()
+        XCTAssertTrue(task.waitForNonExistence(timeout: 5))
+        planner.buttons["History"].click()
+        XCTAssertTrue(task.waitForExistence(timeout: 5))
+        attach(planner, named: "History")
+        task.doubleClick()
+        let delete = app.buttons["删除"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        delete.click()
+        planner.buttons["Trash"].click()
+        XCTAssertTrue(task.waitForExistence(timeout: 5))
+        attach(planner, named: "Trash")
+
+        for (section, create, name) in [("Lists", "New List", "Studio"), ("Tags", "New Tag", "Design")] {
+            planner.buttons[section].click()
+            planner.buttons[create].click()
+            let nameField = app.textFields["名称"]
+            XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+            nameField.click()
+            nameField.typeText(name)
+            app.buttons["保存"].click()
+            XCTAssertTrue(nameField.waitForNonExistence(timeout: 5))
+            let result = planner.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", name)).firstMatch
+            XCTAssertTrue(result.waitForExistence(timeout: 5))
+            attach(planner, named: section)
+        }
 
         app.typeKey(",", modifierFlags: .command)
         let settings = app.windows.containing(.button, identifier: "完成").firstMatch

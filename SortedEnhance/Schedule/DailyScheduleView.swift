@@ -313,48 +313,31 @@ struct DailyScheduleView: View {
                         Text(gap > 0 ? "\(gap) min free" : "\(-gap) min overlap")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    HStack(spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
                         Group {
                             if let start = row.entry.start {
                                 Text(start, format: .dateTime.hour().minute())
                             } else {
-                                Text(verbatim: "")
+                                Color.clear.frame(height: 1).accessibilityHidden(true)
                             }
                         }
-                            .font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
-                            .frame(minWidth: 54, alignment: .trailing)
+                        .font(.system(size: 14)).monospacedDigit().foregroundStyle(.secondary)
+                        .frame(width: 68, alignment: .trailing)
+                        .onTapGesture(count: 2) { edit(row.entry) }
+
                         switch row.entry {
                         case .task(let item):
-                            Image(systemName: statusSymbol(for: item))
-                                .foregroundStyle(item.status == .active ? Color.secondary : .accentColor)
-                                .accessibilityLabel(item.status.rawValue.localizedCapitalized)
-                            Text(item.title)
-                                .strikethrough(item.status != .active)
-                            if item.locked {
-                                Image(systemName: "lock.fill")
-                                    .font(.caption2).foregroundStyle(.secondary)
-                                    .accessibilityLabel("Locked")
-                            }
-                            Spacer()
-                            Text("\(DayPlanner.occupiedMinutes(item, defaultDuration: defaultDuration)) min")
-                                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                            scheduleTask(item)
                         case .event(let event):
-                            Image(systemName: "calendar").foregroundStyle(Color.accentColor)
-                            Text(event.title)
-                            Spacer()
-                            Text(event.isAllDay ? "All day" : "\(Int(event.end.timeIntervalSince(event.start) / 60)) min")
-                                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                            eventRow(event)
                         }
                     }
-                    .font(.system(size: 15))
-                    .padding(.vertical, 5)
+                    .padding(.vertical, 6)
                 }
-                .listRowInsets(.init(top: 2, leading: 28, bottom: 2, trailing: 40))
+                .listRowInsets(.init(top: 2, leading: 20, bottom: 2, trailing: 40))
+                .listRowSeparator(.hidden)
                 .contentShape(Rectangle())
                 .tag(row.entry.id)
-                .onTapGesture(count: 2) { edit(row.entry) }
-                .accessibilityElement(children: .contain)
-                .accessibilityAction { edit(row.entry) }
             }
         }
         .simultaneousGesture(MagnifyGesture().onEnded { gesture in
@@ -373,8 +356,9 @@ struct DailyScheduleView: View {
     private var orderList: some View {
         List(selection: $selection) {
             ForEach(dayTasks) { item in
-                Text(item.title)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                scheduleTask(item)
+                    .padding(.vertical, 6)
+                    .listRowSeparator(.hidden)
                     .contentShape(Rectangle())
                     .tag(Entry.task(item).id)
                     .draggable(item.id.uuidString)
@@ -386,9 +370,57 @@ struct DailyScheduleView: View {
                         store.save(DayPlanner.reorder(dayTasks, selection: ids, before: item.id))
                         return true
                     }
-                    .onTapGesture(count: 2) { onEdit(item) }
             }
         }
+    }
+
+    private func scheduleTask(_ item: PlannerItem) -> some View {
+        PlannerTaskRow(
+            item: item, listName: store.lists.first { $0.id == item.listID }?.name,
+            durationMinutes: DayPlanner.occupiedMinutes(item, defaultDuration: defaultDuration),
+            completionIdentifier: "ScheduleComplete-" + item.id.uuidString,
+            onToggleCompletion: { store.toggleOccurrenceCompletion(id: item.id) },
+            onOpen: { onEdit(item) }
+        )
+    }
+
+    private func eventRow(_ event: PlannerCalendarEvent) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "calendar")
+                .foregroundStyle(PlannerSection.schedule.tint)
+                .frame(width: 18, height: 18)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event.title).font(.system(size: 15, weight: .semibold))
+                HStack(spacing: 6) {
+                    Label(event.calendarTitle, systemImage: "circle.fill")
+                        .foregroundStyle(PlannerSection.schedule.tint)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(PlannerSection.schedule.tint.opacity(0.1), in: Capsule())
+                    Group {
+                        if event.isAllDay {
+                            Text("All day")
+                        } else {
+                            HStack(spacing: 3) {
+                                Text("\(Int(event.end.timeIntervalSince(event.start) / 60)) min")
+                                Image(systemName: "arrow.right").accessibilityHidden(true)
+                                Text(event.end, format: .dateTime.hour().minute())
+                            }
+                        }
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(.quaternary, in: Capsule())
+                }
+                .font(.caption)
+                .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) { onEvent(event, day) }
+        .accessibilityElement(children: .contain)
+        .accessibilityAction { onEvent(event, day) }
     }
 
     private var batchActions: some View {
@@ -422,14 +454,6 @@ struct DailyScheduleView: View {
                 }
                 .fixedSize()
             }
-        }
-    }
-
-    private func statusSymbol(for item: PlannerItem) -> String {
-        switch item.status {
-        case .active: "circle"
-        case .completed: "checkmark.circle.fill"
-        case .canceled: "xmark.circle"
         }
     }
 

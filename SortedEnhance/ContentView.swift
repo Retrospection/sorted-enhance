@@ -3,6 +3,7 @@ import AppKit
 
 struct ContentView: View {
     @ObservedObject var store: PlannerStore
+    @AppStorage("planner.sidebarWidth") private var preferredSidebarWidth = 300.0
     @State private var section: PlannerSection = .schedule
     @State private var search = ""
     @State private var editing: PlannerItem?
@@ -38,7 +39,8 @@ struct ContentView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let sidebarWidth = min(300, max(200, geometry.size.width * 0.293))
+            let sidebarRange = 200.0...max(200, min(500, geometry.size.width - 460))
+            let sidebarWidth = min(sidebarRange.upperBound, max(sidebarRange.lowerBound, preferredSidebarWidth))
             HStack(spacing: 0) {
                 PlannerSidebar(section: Binding(get: { section }, set: { destination in
                     finishSearch()
@@ -54,6 +56,14 @@ struct ContentView: View {
                         } else if schedulerPresented || editorPresented {
                             Color(nsColor: .textBackgroundColor).opacity(0.8)
                                 .onTapGesture { if schedulerPresented { schedulerPresented = false } }
+                        }
+                    }
+                    .overlay(alignment: .trailing) {
+                        if !searching && !schedulerPresented && !editorPresented {
+                            PlannerSidebarDivider(width: sidebarWidth, range: sidebarRange, availableWidth: geometry.size.width) {
+                                preferredSidebarWidth = $0
+                            }
+                            .frame(width: 8)
                         }
                     }
                 ZStack(alignment: .bottomTrailing) {
@@ -195,35 +205,29 @@ struct ContentView: View {
     }
 
     private var taskList: some View {
-            List(selection: $selectedTask) {
-                ForEach(visibleItems) { item in
-                    HStack {
-                        if item.status != .active {
-                            Image(systemName: item.status == .completed ? "checkmark.circle" : "xmark.circle")
-                                .accessibilityLabel(item.status == .completed ? "Completed" : "Canceled")
-                        }
-                        Text(item.title)
-                        Spacer()
-                        if let listID = item.listID, let list = store.lists.first(where: { $0.id == listID }) {
-                            Text(list.name).foregroundStyle(.secondary)
-                        }
-                    }
-                    .tag(item.id)
-                    .contentShape(Rectangle())
-                    .onTapGesture(count: 2) { editing = item }
-                    .accessibilityElement(children: .contain)
-                    .accessibilityAction { editing = item }
+        List(selection: $selectedTask) {
+            ForEach(visibleItems) { item in
+                PlannerTaskRow(item: item,
+                               listName: store.lists.first { $0.id == item.listID }?.name,
+                               completionIdentifier: "InboxComplete-" + item.id.uuidString,
+                               onToggleCompletion: {
+                                   if store.toggleOccurrenceCompletion(id: item.id), selectedTask == item.id {
+                                       selectedTask = nil
+                                   }
+                               },
+                               onOpen: { editing = item })
                     .contextMenu { Button("Open") { editing = item } }
-                }
+                    .tag(item.id)
             }
-            .onKeyPress(.return) {
-                guard let selectedTask, let item = visibleItems.first(where: { $0.id == selectedTask }) else { return .ignored }
-                editing = item
-                return .handled
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .padding(.horizontal, 32)
+        }
+        .onKeyPress(.return) {
+            guard let selectedTask, let item = visibleItems.first(where: { $0.id == selectedTask }) else { return .ignored }
+            editing = item
+            return .handled
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .padding(.horizontal, 32)
     }
 
     private func closeEditor() {

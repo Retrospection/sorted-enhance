@@ -78,7 +78,7 @@ jobs:
           images="$RUNNER_TEMP/visual-images"
           xcrun xcresulttool export attachments --path "$RUNNER_TEMP/visual.xcresult" --output-path "$exports"
           mkdir "$images"
-          for name in Schedule QuickSearch Inbox TaskEditor Settings; do
+          for name in Schedule QuickSearch Inbox TaskEditor PopulatedInbox Lists Tags History Trash Settings; do
             file=$(jq -er --arg name "SortedEnhance-$name" '
               [.[] | .attachments[] | select(.suggestedHumanReadableName | startswith($name))
                 | select(.exportedFileName | endswith(".png")) | .exportedFileName]

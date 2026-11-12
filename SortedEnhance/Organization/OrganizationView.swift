@@ -261,15 +261,26 @@ struct OrganizationView: View {
                 .padding(.horizontal, 44)
             }
             List(visible, selection: $selected) { item in
-                Text(item.title).font(.system(size: 15, weight: .semibold)).tag(item.id)
+                PlannerTaskRow(
+                    item: item, listName: store.lists.first { $0.id == item.listID }?.name,
+                    completionIdentifier: "CollectionComplete-" + item.id.uuidString,
+                    onToggleCompletion: { store.toggleOccurrenceCompletion(id: item.id) },
+                    onOpen: { onEdit(item) }
+                )
+                .padding(.vertical, 5)
+                .listRowSeparator(.hidden)
+                .tag(item.id)
             }
             .listStyle(.plain)
             .contextMenu(forSelectionType: UUID.self) { ids in
                 if ids.count == 1, let item = visible.first(where: { ids.contains($0.id) }) {
                     Button("Edit Task") { onEdit(item) }
                 }
-            } primaryAction: { ids in
-                if ids.count == 1, let item = visible.first(where: { ids.contains($0.id) }) { onEdit(item) }
+            }
+            .onKeyPress(.return) {
+                guard selected.count == 1, let item = selection.first else { return .ignored }
+                onEdit(item)
+                return .handled
             }
             .padding(.horizontal, 32)
         }

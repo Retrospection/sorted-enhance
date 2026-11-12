@@ -1,5 +1,10 @@
 import SwiftUI
 
+enum SettingsColor {
+    static let secondary = Color(red: 159 / 255, green: 179 / 255, blue: 200 / 255)
+    static let control = Color(red: 0, green: 0.62, blue: 1)
+}
+
 enum LunarCalendarPreference {
     static let key = "planner.calendar.showLunarDates"
 
@@ -58,15 +63,19 @@ struct PlannerSettingsView: View {
         VStack(spacing: 0) {
             HStack(spacing: 9) {
                 Image(systemName: "gearshape")
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(SettingsColor.secondary)
                 Text("Settings").font(.system(size: 19, weight: .bold))
                 Spacer()
                 Button("Done") { dismiss() }
                     .font(.system(size: 15, weight: .semibold))
                     .buttonStyle(.plain)
+                    .foregroundStyle(SettingsColor.secondary)
                     .keyboardShortcut(.cancelAction)
             }
             .padding(.horizontal, 16)
             .frame(height: 50)
+            .overlay(alignment: .bottom) { Divider() }
             ScrollView {
                 VStack(spacing: 42) {
                     SettingsSection("Sorted Enhance") {
@@ -89,6 +98,7 @@ struct PlannerSettingsView: View {
                 .padding(.bottom, 30)
             }
         }
+        .tint(SettingsColor.secondary)
         .foregroundStyle(.white)
         .background(Color(red: 0.153, green: 0.204, blue: 0.267))
         .environment(\.colorScheme, .dark)
@@ -208,6 +218,7 @@ struct GeneralPreferencesView: View {
                     set: { lunarDates = $0 }
                 ))
                 .toggleStyle(.switch)
+                .tint(SettingsColor.control)
             }
         }
         .labelsHidden()

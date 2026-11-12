@@ -12,9 +12,10 @@ struct PlannerFeedbackSettingsRows: View {
         Group {
             SettingsRow("Task alerts", icon: "bell.fill", color: .green) {
                 Toggle("Task alerts", isOn: Binding(get: { alertsEnabled }, set: { setAlertsEnabled($0) }))
+                    .tint(SettingsColor.control)
                     .disabled(requesting)
             }
-            SettingsRow("Alert sound", icon: "speaker.wave.2.fill", color: .purple) {
+            SettingsRow("Alert sound", icon: "music.note", color: .purple) {
                 Picker("Alert sound", selection: $sound) {
                     Text("System default").tag(TaskAlertSound.system)
                     Text("Silent").tag(TaskAlertSound.silent)
@@ -31,6 +32,7 @@ struct PlannerFeedbackSettingsRows: View {
             }
             SettingsRow("Completion sound", icon: "speaker.wave.1.fill", color: .yellow) {
                 Toggle("Completion sound", isOn: $completion)
+                    .tint(SettingsColor.control)
             }
         }
         .toggleStyle(.switch)

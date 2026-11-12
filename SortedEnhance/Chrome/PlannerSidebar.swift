@@ -44,6 +44,7 @@ struct PlannerSidebar: View {
     @Environment(\.calendar) private var calendar
     @Environment(\.locale) private var locale
     @Environment(\.layoutDirection) private var layoutDirection
+    @AppStorage(LunarCalendarPreference.key) private var lunarDates: Bool?
     @State private var browsingMonth: Date?
     @FocusState private var focusedDate: Date?
 
@@ -155,7 +156,7 @@ struct PlannerSidebar: View {
             HStack(spacing: 1) {
                 Text(calendar.component(.day, from: date), format: .number.locale(locale))
                     .font(.system(size: 14, weight: .bold))
-                if locale.language.languageCode?.identifier == "zh" {
+                if LunarCalendarPreference.isShown(lunarDates, locale: locale) {
                     let lunarDay = SidebarMonth.lunarDay(date, timeZone: calendar.timeZone)
                     VStack(spacing: 0) {
                         ForEach(Array(lunarDay.enumerated()), id: \.offset) { _, character in

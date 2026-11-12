@@ -116,7 +116,7 @@ struct TaskAlertPicker: View {
             }
         }
         .onChange(of: item.reminderOffsetMinutes) { _, newValue in
-            guard newValue != nil else { return }
+            guard newValue != nil, PlannerFeedback().alertsEnabled else { return }
             Task {
                 do {
                     if try await !PlannerNotifications.requestPermission() {

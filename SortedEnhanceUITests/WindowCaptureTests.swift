@@ -71,10 +71,21 @@ final class WindowCaptureTests: XCTestCase {
         }
 
         app.typeKey(",", modifierFlags: .command)
-        let settings = app.windows.containing(.button, identifier: "完成").firstMatch
-        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        let settings = planner.sheets.firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(settings.staticTexts["设置"].firstMatch.exists)
+        let done = settings.buttons["完成"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertTrue(planner.frame.contains(settings.frame))
         attach(settings, named: "Settings")
+        attach(planner, named: "PlannerWithSettings")
+
+        done.click()
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 5))
+        planner.buttons["设置"].click()
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 5))
     }
 
     private func attach(_ window: XCUIElement, named name: String) {

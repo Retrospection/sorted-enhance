@@ -306,6 +306,13 @@ struct TaskEditorView: View {
             child.listID = item.listID
             changes.append(child)
         }
-        if store.save(changes) { close() } else { validationMessage = store.errorMessage }
+        if store.save(changes) {
+            if item.status == .completed && current?.status != .completed && !item.deleted {
+                PlannerFeedback.playCompletion()
+            }
+            close()
+        } else {
+            validationMessage = store.errorMessage
+        }
     }
 }

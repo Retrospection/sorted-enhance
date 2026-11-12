@@ -1,5 +1,13 @@
 import SwiftUI
 
+enum LunarCalendarPreference {
+    static let key = "planner.calendar.showLunarDates"
+
+    static func isShown(_ override: Bool?, locale: Locale) -> Bool {
+        override ?? (locale.language.languageCode?.identifier == "zh")
+    }
+}
+
 private enum PreferenceKey {
     static let theme = "planner.appearance.theme"
     static let rowSize = "planner.appearance.rowSize"
@@ -60,23 +68,27 @@ struct PlannerSettingsView: View {
             .padding(.horizontal, 16)
             .frame(height: 50)
             ScrollView {
-                VStack(spacing: 36) {
-                    GeneralPreferencesView()
-                    RecoveryView(recovery: recovery)
-                    if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
-                        SettingsSection("About") {
-                            SettingsRow("Version", icon: "info.circle", color: .gray) {
+                VStack(spacing: 42) {
+                    SettingsSection("Sorted Enhance") {
+                        SettingsRow("Version", icon: "info.circle.fill", color: .blue) {
+                            if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
                                 Text(verbatim: version)
                             }
                         }
+                        Link(destination: URL(string: "https://github.com/Retrospection/sorted-enhance")!) {
+                            SettingsRow("Project on GitHub", icon: "trophy.fill", color: .green) {
+                                Image(systemName: "arrow.up.right").accessibilityHidden(true)
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
+                    GeneralPreferencesView()
+                    RecoveryView(recovery: recovery)
                 }
-                .padding(.top, 28)
+                .padding(.top, 35)
                 .padding(.bottom, 30)
             }
         }
-        .frame(width: 620, height: 680)
-        .background(SettingsWindowControls())
         .foregroundStyle(.white)
         .background(Color(red: 0.153, green: 0.204, blue: 0.267))
         .environment(\.colorScheme, .dark)
@@ -95,12 +107,12 @@ struct SettingsSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.65))
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Color(red: 155 / 255, green: 174 / 255, blue: 193 / 255))
                 .padding(.horizontal, 16)
                 .padding(.bottom, 7)
                 .accessibilityAddTraits(.isHeader)
-            Divider()
+            Divider().padding(.horizontal, 16)
             content
         }
     }
@@ -124,24 +136,21 @@ struct SettingsRow<Content: View>: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 29, height: 29)
-                    .background(color, in: RoundedRectangle(cornerRadius: 7))
-                    .accessibilityHidden(true)
-                title.font(.system(size: 15, weight: .semibold))
-                Spacer()
-                content
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.72))
-            }
-            .padding(.horizontal, 16)
-            .frame(minHeight: 50)
-            Divider().padding(.leading, 53)
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 29, height: 29)
+                .background(color, in: RoundedRectangle(cornerRadius: 7))
+                .accessibilityHidden(true)
+            title.font(.system(size: 15, weight: .semibold))
+            Spacer()
+            content
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.72))
         }
+        .padding(.horizontal, 16)
+        .frame(minHeight: 50)
         .contentShape(Rectangle())
     }
 }
@@ -151,18 +160,21 @@ struct GeneralPreferencesView: View {
     @AppStorage(PreferenceKey.rowSize) private var rowSize = RowSize.system
     @AppStorage(PreferenceKey.firstWeekday) private var firstWeekday = 2
     @AppStorage(PreferenceKey.clock) private var clock = Clock.system
+    @AppStorage(LunarCalendarPreference.key) private var lunarDates: Bool?
+    @Environment(\.locale) private var locale
     @Environment(\.calendar) private var calendar
 
     var body: some View {
-        SettingsSection("Appearance") {
-            SettingsRow("Theme", icon: "circle.lefthalf.filled", color: .indigo) {
+        SettingsSection("General") {
+            SettingsRow("Theme", icon: "paintpalette.fill", color: .blue) {
                 Picker("Theme", selection: $theme) {
                     Text("System").tag(Theme.system)
                     Text("Light").tag(Theme.light)
                     Text("Dark").tag(Theme.dark)
                 }
             }
-            SettingsRow("Item spacing", icon: "text.line.first.and.arrowtriangle.forward", color: .blue) {
+            PlannerFeedbackSettingsRows()
+            SettingsRow("Item spacing", icon: "line.3.horizontal", color: .gray) {
                 Picker("Item spacing", selection: $rowSize) {
                     Text("System").tag(RowSize.system)
                     Text("Compact").tag(RowSize.compact)
@@ -190,6 +202,13 @@ struct GeneralPreferencesView: View {
                     Text("24-hour").tag(Clock.twentyFourHour)
                 }
             }
+            SettingsRow("Lunar calendar", icon: "moon.fill", color: .indigo) {
+                Toggle("Lunar calendar", isOn: Binding(
+                    get: { LunarCalendarPreference.isShown(lunarDates, locale: locale) },
+                    set: { lunarDates = $0 }
+                ))
+                .toggleStyle(.switch)
+            }
         }
         .labelsHidden()
         .pickerStyle(.menu)
@@ -214,21 +233,5 @@ struct PlannerPreferencesModifier: ViewModifier {
             .environment(\.defaultMinListRowHeight, rowSize.minimumHeight(default: defaultRowHeight))
             .environment(\.locale, clock.locale(from: locale))
             .environment(\.calendar, displayedCalendar)
-    }
-}
-
-
-private struct SettingsWindowControls: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { WindowObserver() }
-    func updateNSView(_ view: NSView, context: Context) {}
-
-    private final class WindowObserver: NSView {
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            for control in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
-                window?.standardWindowButton(control)?.isHidden = true
-            }
-            window?.isMovableByWindowBackground = true
-        }
     }
 }

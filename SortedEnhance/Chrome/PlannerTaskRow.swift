@@ -82,3 +82,14 @@ struct PlannerTaskRow: View {
         .background(.quaternary, in: Capsule())
     }
 }
+
+extension PlannerFeedback {
+    @MainActor @discardableResult
+    static func toggleCompletion(id: UUID, in store: PlannerStore) -> Bool {
+        guard store.toggleOccurrenceCompletion(id: id) else { return false }
+        if store.items.first(where: { $0.id == id })?.status == .completed {
+            playCompletion()
+        }
+        return true
+    }
+}

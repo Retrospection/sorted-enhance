@@ -189,6 +189,7 @@
 "Select the same folder in iCloud Drive on each Mac." = "请在每台 Mac 上选择 iCloud 云盘中的同一文件夹。";
 "Set start time" = "指定开始时间";
 "Settings" = "设置";
+"Settings…" = "设置…";
 "Show Date" = "显示日期";
 "Show List" = "显示列表";
 "Sidebar" = "侧边栏";
@@ -253,3 +254,14 @@
 "Empty Trash?" = "清空回收站？";
 "No history at the moment." = "暂无历史记录";
 "Remove all tasks from Trash? You can undo this change." = "清空回收站内的所有任务？可撤销此操作。";
+"Project on GitHub" = "GitHub 项目主页";
+"Lunar calendar" = "农历";
+"Alert sound" = "提醒声音";
+"System default" = "系统默认";
+"Silent" = "静音";
+"App badge" = "应用角标";
+"Overdue" = "已逾期";
+"Overdue + Anytime" = "已逾期及不限时间";
+"Completion sound" = "完成音效";
+"Allow task alerts in System Settings to receive reminders." = "请在系统设置中允许任务通知以接收提醒。";
+"Could not change notification authorization." = "无法更改通知授权。";

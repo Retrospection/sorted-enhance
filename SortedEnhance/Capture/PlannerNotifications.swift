@@ -1,4 +1,5 @@
-import SwiftUI
+import AppKit
+import Combine
 import UserNotifications
 import OSLog
 
@@ -27,10 +28,10 @@ struct PlannerAlert: Equatable {
         repeatingComponents = nil
     }
 
-    var request: UNNotificationRequest {
+    func request(sound: TaskAlertSound) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = title
-        content.sound = .default
+        content.sound = sound == .system ? .default : nil
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let instant = calendar.dateComponents([.calendar, .timeZone, .year, .month, .day, .hour, .minute, .second], from: date)
@@ -41,8 +42,8 @@ struct PlannerAlert: Equatable {
         return UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
     }
 
-    func matches(_ existing: UNNotificationRequest) -> Bool {
-        guard existing.content.title == title,
+    func matches(_ existing: UNNotificationRequest, sound: TaskAlertSound) -> Bool {
+        guard (existing.content.sound != nil) == (sound == .system), existing.content.title == title,
               let trigger = existing.trigger as? UNCalendarNotificationTrigger else { return false }
         if let repeatingComponents {
             return trigger.repeats && trigger.dateComponents == repeatingComponents
@@ -106,6 +107,21 @@ struct PlannerAlert: Equatable {
         return Array(explicit.prefix(requestBudget))
     }
 
+    static func changes(
+        for candidates: [PlannerAlert], pending: [UNNotificationRequest], sound: TaskAlertSound, now: Date
+    ) -> (remove: [String], schedule: [PlannerAlert]) {
+        let alerts = candidates.filter { $0.repeatingComponents != nil || $0.date > now }
+        let desired = Set(alerts.map(\.identifier))
+        let requests = Dictionary(uniqueKeysWithValues: pending.map { ($0.identifier, $0) })
+        let remove = pending.map(\.identifier).filter { $0.hasPrefix(prefix) && !desired.contains($0) }
+        // Adding an existing identifier replaces its request without a cancellation gap.
+        let schedule = alerts.filter { alert in
+            guard let request = requests[alert.identifier] else { return true }
+            return !alert.matches(request, sound: sound)
+        }
+        return (remove, schedule)
+    }
+
     private static func repeatPattern(
         _ rule: PlannerRecurrence, offset: Int, firstFire: Date, now: Date
     ) -> DateComponents? {
@@ -145,17 +161,30 @@ final class PlannerNotifications: NSObject, UNUserNotificationCenterDelegate {
 
     private let center = UNUserNotificationCenter.current()
     private let log = Logger(subsystem: "SortedEnhance", category: "TaskAlerts")
-    private var latest: [PlannerAlert]?
+    private var latest: (alerts: [PlannerAlert], sound: TaskAlertSound)?
+    private var feedback = PlannerFeedback()
+    private var subscription: AnyCancellable?
     private var items: [PlannerItem]?
     private var refill: Task<Void, Never>?
     private var updating = false
 
     private override init() {
         super.init()
+        NotificationCenter.default.addObserver(self, selector: #selector(preferencesChanged),
+                                               name: UserDefaults.didChangeNotification, object: UserDefaults.standard)
         let selector = #selector(clockChanged)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: selector, name: NSWorkspace.didWakeNotification, object: nil)
-        for name in [Notification.Name.NSCalendarDayChanged, .NSSystemTimeZoneDidChange, .NSSystemClockDidChange] {
+        for name in [NSApplication.didBecomeActiveNotification, .NSCalendarDayChanged, .NSSystemTimeZoneDidChange, .NSSystemClockDidChange] {
             NotificationCenter.default.addObserver(self, selector: selector, name: name, object: nil)
+        }
+    }
+
+    @objc private nonisolated func preferencesChanged(_ notification: Notification) {
+        Task { @MainActor in
+            let updated = PlannerFeedback()
+            guard updated != feedback else { return }
+            feedback = updated
+            scheduleRefresh()
         }
     }
 
@@ -173,23 +202,41 @@ final class PlannerNotifications: NSObject, UNUserNotificationCenterDelegate {
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        guard notification.request.identifier.hasPrefix(PlannerAlert.prefix) else { return [.banner, .list, .sound] }
+        let preferences = PlannerFeedback()
+        guard preferences.alertsEnabled else { return [] }
+        return preferences.alertSound == .system ? [.banner, .list, .sound] : [.banner, .list]
     }
 
-    func update(_ items: [PlannerItem]) {
+    func observe(_ store: PlannerStore) {
         center.delegate = self
-        self.items = items
-        scheduleRefresh()
+        subscription = store.$snapshot.sink { [weak self] snapshot in
+            guard let self else { return }
+            items = store.libraryIsReadable ? snapshot.items : nil
+            scheduleRefresh()
+        }
     }
 
     private func scheduleRefresh() {
-        guard let items else { return }
+        // A damaged library must preserve existing reminders unless the user disabled alerts.
+        guard items != nil || !feedback.alertsEnabled else { return }
+        let items = items ?? []
         let now = Date.now
-        let alerts = PlannerAlert.plan(for: items, now: now)
+        let alerts = feedback.alertsEnabled ? PlannerAlert.plan(for: items, now: now) : []
+        let badge = feedback.badgeMode.count(in: items, now: now)
+        NSApplication.shared.dockTile.badgeLabel = badge > 0 ? String(badge) : nil
+
+        var nextRefresh = alerts.first?.date
+        if feedback.badgeMode == .overdue || feedback.badgeMode == .overdueAndAnytime {
+            if let nextStart = items.lazy.filter({ !$0.deleted && $0.status == .active })
+                .compactMap(\.start).filter({ $0 > now }).min() {
+                nextRefresh = min(nextStart, nextRefresh ?? nextStart)
+            }
+        }
         refill?.cancel()
-        if let first = alerts.first {
+        if let nextRefresh {
             // Refill a consumed slot even when no window is active or no task changes.
-            let delay = max(1, first.date.timeIntervalSince(now) + 1)
+            let delay = max(1, nextRefresh.timeIntervalSince(now) + 1)
             refill = Task {
                 do {
                     try await Task.sleep(for: .seconds(delay))
@@ -201,52 +248,30 @@ final class PlannerNotifications: NSObject, UNUserNotificationCenterDelegate {
                 }
             }
         }
-        latest = alerts
+        latest = (alerts, feedback.alertSound)
         guard !updating else { return }
         updating = true
         Task {
-            while let alerts = latest {
+            while let pending = latest {
                 latest = nil
-                await reconcile(alerts)
+                await reconcile(pending.alerts, sound: pending.sound)
             }
             updating = false
         }
     }
 
-    private func reconcile(_ candidates: [PlannerAlert]) async {
+    private func reconcile(_ candidates: [PlannerAlert], sound: TaskAlertSound) async {
         let pending = await center.pendingNotificationRequests()
-        let now = Date()
-        let alerts = candidates.filter { $0.repeatingComponents != nil || $0.date > now }
-        let desired = Dictionary(uniqueKeysWithValues: alerts.map { ($0.identifier, $0) })
-        var unchanged: Set<String> = []
-        var obsolete: [String] = []
-        for request in pending where request.identifier.hasPrefix(PlannerAlert.prefix) {
-            if desired[request.identifier]?.matches(request) == true {
-                unchanged.insert(request.identifier)
-            } else {
-                obsolete.append(request.identifier)
-            }
+        let changes = PlannerAlert.changes(for: candidates, pending: pending, sound: sound, now: Date.now)
+        if !changes.remove.isEmpty {
+            center.removePendingNotificationRequests(withIdentifiers: changes.remove)
         }
-        if !obsolete.isEmpty {
-            center.removePendingNotificationRequests(withIdentifiers: obsolete)
-        }
-        for alert in alerts where !unchanged.contains(alert.identifier) {
+        for alert in changes.schedule {
             do {
-                try await center.add(alert.request)
+                try await center.add(alert.request(sound: sound))
             } catch {
                 log.error("Could not schedule task alert: \(error.localizedDescription, privacy: .public)")
             }
-        }
-    }
-}
-
-extension View {
-    func plannerNotifications(for items: [PlannerItem]) -> some View {
-        onChange(of: items, initial: true) { _, items in
-            PlannerNotifications.shared.update(items)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            PlannerNotifications.shared.update(items)
         }
     }
 }

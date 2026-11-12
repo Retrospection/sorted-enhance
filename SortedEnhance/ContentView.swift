@@ -3,6 +3,8 @@ import AppKit
 
 struct ContentView: View {
     @ObservedObject var store: PlannerStore
+    let recovery: PlannerRecovery
+    @Binding var settingsPresented: Bool
     @AppStorage("planner.sidebarWidth") private var preferredSidebarWidth = 300.0
     @State private var section: PlannerSection = .schedule
     @State private var search = ""
@@ -15,7 +17,6 @@ struct ContentView: View {
     @State private var searching = false
     @State private var collectionRequest = 0
     @State private var helpPresented = false
-    @Environment(\.openSettings) private var openSettings
     @StateObject private var calendars = SystemCalendarStore()
     @State private var eventToEdit: PlannerCalendarEvent?
     @State private var editingEvent = false
@@ -47,7 +48,7 @@ struct ContentView: View {
                     collectionToShow = nil
                     listNavigation = UUID()
                     section = destination
-                }), day: $scheduleDay, onSettings: { finishSearch(); openSettings() },
+                }), day: $scheduleDay, onSettings: { settingsPresented = true },
                                onHelp: { finishSearch(); helpPresented = true })
                     .frame(width: sidebarWidth)
                     .overlay {
@@ -115,12 +116,21 @@ struct ContentView: View {
                     }
                 }
             }
+            .sheet(isPresented: $settingsPresented) {
+                PlannerSettingsView(recovery: recovery)
+                    .frame(width: min(620, geometry.size.width - 32),
+                           height: min(680, geometry.size.height - 40))
+                    .presentationCornerRadius(12)
+            }
         }
         .tint(section.tint)
         .ignoresSafeArea(.container, edges: .top)
         .focusedSceneValue(\.plannerSearch, { startSearch() })
         .focusedSceneValue(\.plannerCreate, { createInSection() })
         .focusedSceneValue(\.plannerQuickCapture, { finishSearch(); quickCapture = true })
+        .onChange(of: settingsPresented) { _, presented in
+            if presented { finishSearch() }
+        }
         .onChange(of: section) { _, _ in
             finishSearch()
             schedulerPresented = false
@@ -145,7 +155,6 @@ struct ContentView: View {
         .onReceive(DistributedNotificationCenter.default().publisher(for: SharedCapture.notification)) { _ in
             store.importSharedCaptures()
         }
-        .plannerNotifications(for: store.items)
         .onAppear {
             store.importSharedCaptures()
             materialize(through: .now)
@@ -211,7 +220,7 @@ struct ContentView: View {
                                listName: store.lists.first { $0.id == item.listID }?.name,
                                completionIdentifier: "InboxComplete-" + item.id.uuidString,
                                onToggleCompletion: {
-                                   if store.toggleOccurrenceCompletion(id: item.id), selectedTask == item.id {
+                                   if PlannerFeedback.toggleCompletion(id: item.id, in: store), selectedTask == item.id {
                                        selectedTask = nil
                                    }
                                },

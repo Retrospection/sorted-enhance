@@ -12,7 +12,7 @@ for main in Tests/*/main.swift; do
     case "$suite" in
         Core) ;;
         Calendar) sources+=(SortedEnhance/Calendar/{EventAnnotation,EventCreationDraft,EventAlerts}.swift) ;;
-        Capture) sources+=(SortedEnhance/Capture/{QuickEntry,PlannerNotifications}.swift) ;;
+        Capture) sources+=(SortedEnhance/Capture/{QuickEntry,PlannerFeedback,PlannerNotifications}.swift) ;;
         Integrations) sources=(SortedEnhance/Integrations/PlannerLink.swift) ;;
         Organization) sources+=(SortedEnhance/Organization/TaskMerge.swift) ;;
         Recurrence) sources+=(SortedEnhance/Recurrence/PlannerRepetition.swift) ;;

@@ -379,7 +379,7 @@ struct DailyScheduleView: View {
             item: item, listName: store.lists.first { $0.id == item.listID }?.name,
             durationMinutes: DayPlanner.occupiedMinutes(item, defaultDuration: defaultDuration),
             completionIdentifier: "ScheduleComplete-" + item.id.uuidString,
-            onToggleCompletion: { store.toggleOccurrenceCompletion(id: item.id) },
+            onToggleCompletion: { PlannerFeedback.toggleCompletion(id: item.id, in: store) },
             onOpen: { onEdit(item) }
         )
     }

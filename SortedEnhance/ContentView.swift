@@ -7,7 +7,7 @@ struct ContentView: View {
     @State private var search = ""
     @State private var editing: PlannerItem?
     @State private var quickCapture = false
-    @State private var listToShow: UUID?
+    @State private var collectionToShow: CollectionFilter?
     @State private var listNavigation = UUID()
     @State private var scheduleDay = Date.now
     @State private var schedulerPresented = false
@@ -21,19 +21,13 @@ struct ContentView: View {
     @State private var eventDay = Date.now
     @State private var eventDraft: PlannerItem?
     @State private var eventFields: EventCreationDraft?
-    @State private var searchEvents: [PlannerCalendarEvent] = []
     @State private var selectedTask: UUID?
     @Environment(\.scenePhase) private var phase
 
-    private var isSearching: Bool { searching }
     private var editorPresented: Bool { editing != nil || editingEvent }
 
     private var visibleItems: [PlannerItem] {
         store.items.filter { item in
-            if isSearching {
-                return !search.isEmpty && !item.deleted && ([item.title, item.notes] + item.tags)
-                    .contains { $0.localizedCaseInsensitiveContains(search) }
-            }
             switch section {
             case .history: return !item.deleted && item.status != .active
             case .trash: return item.deleted
@@ -44,17 +38,20 @@ struct ContentView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let sidebarWidth = min(300, max(200, geometry.size.width * 0.293))
             HStack(spacing: 0) {
                 PlannerSidebar(section: Binding(get: { section }, set: { destination in
                     finishSearch()
-                    listToShow = nil
+                    collectionToShow = nil
                     listNavigation = UUID()
                     section = destination
-                }), day: $scheduleDay, onSettings: { openSettings() },
-                               onHelp: { helpPresented = true })
-                    .frame(width: min(300, max(200, geometry.size.width * 0.293)))
+                }), day: $scheduleDay, onSettings: { finishSearch(); openSettings() },
+                               onHelp: { finishSearch(); helpPresented = true })
+                    .frame(width: sidebarWidth)
                     .overlay {
-                        if schedulerPresented || editorPresented {
+                        if searching {
+                            Color(nsColor: .textBackgroundColor).opacity(0.8).allowsHitTesting(false)
+                        } else if schedulerPresented || editorPresented {
                             Color(nsColor: .textBackgroundColor).opacity(0.8)
                                 .onTapGesture { if schedulerPresented { schedulerPresented = false } }
                         }
@@ -62,8 +59,8 @@ struct ContentView: View {
                 ZStack(alignment: .bottomTrailing) {
                     Color(nsColor: .textBackgroundColor)
                     detail
-                        .accessibilityHidden(editorPresented)
-                        .disabled(editorPresented)
+                        .accessibilityHidden(editorPresented || searching)
+                        .disabled(editorPresented || searching)
                     if !searching && !schedulerPresented && !editorPresented && section != .history && section != .trash {
                         Button(action: createInSection) {
                             Image(systemName: "plus")
@@ -80,8 +77,17 @@ struct ContentView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay {
-                    if let item = editing {
+                .overlay(alignment: .top) {
+                    if searching {
+                        ZStack(alignment: .top) {
+                            Color(nsColor: .textBackgroundColor).opacity(0.8)
+                                .onTapGesture(perform: finishSearch)
+                            PlannerQuickSearch(store: store, calendars: calendars, query: $search,
+                                               onDone: finishSearch, onOpen: openSearchResult)
+                                .frame(width: min(560, geometry.size.width - sidebarWidth - 32), height: 300)
+                                .padding(.top, 38)
+                        }
+                    } else if let item = editing {
                         PlannerEditorOverlay {
                             TaskEditorView(item: item, store: store, onClose: closeEditor, onNewEvent: { draft in
                                 openEvent(nil, day: draft.day ?? scheduleDay, draft: draft)
@@ -104,7 +110,7 @@ struct ContentView: View {
         .ignoresSafeArea(.container, edges: .top)
         .focusedSceneValue(\.plannerSearch, { startSearch() })
         .focusedSceneValue(\.plannerCreate, { createInSection() })
-        .focusedSceneValue(\.plannerQuickCapture, { quickCapture = true })
+        .focusedSceneValue(\.plannerQuickCapture, { finishSearch(); quickCapture = true })
         .onChange(of: section) { _, _ in
             finishSearch()
             schedulerPresented = false
@@ -118,8 +124,6 @@ struct ContentView: View {
                 Button("Done") { helpPresented = false }.keyboardShortcut(.cancelAction)
             }.padding(24).frame(width: 300)
         }
-        .onChange(of: search) { searchEvents = calendars.search(search) }
-        .onReceive(calendars.$calendars.receive(on: RunLoop.main)) { _ in searchEvents = calendars.search(search) }
         .sheet(isPresented: $quickCapture) { QuickCaptureView(store: store) }
         .alert("Could not update planner", isPresented: Binding(
             get: { store.errorMessage != nil },
@@ -146,7 +150,7 @@ struct ContentView: View {
     }
 
     @ViewBuilder private var detail: some View {
-        if section == .schedule && !isSearching {
+        if section == .schedule {
             DailyScheduleView(store: store, onEdit: { editing = $0 }, onNew: { day in
                 var item = PlannerItem(title: "")
                 item.day = day
@@ -154,40 +158,32 @@ struct ContentView: View {
             }, day: $scheduleDay, schedulerPresented: $schedulerPresented,
                onDayChange: { materialize(through: $0) }, onSearch: startSearch,
                onEvent: { event, day in openEvent(event, day: day) })
-        } else if (section == .lists || section == .tags) && !isSearching {
+        } else if section == .lists || section == .tags {
             OrganizationView(store: store, section: section == .lists ? .lists : .tags,
                              onEdit: { editing = $0 }, onSearch: startSearch,
-                             newCollectionSignal: collectionRequest, initialListID: listToShow)
+                             newCollectionSignal: collectionRequest, initialFilter: collectionToShow)
                 .id(listNavigation)
         } else {
             VStack(alignment: .leading, spacing: 0) {
-                if isSearching {
-                    HStack(spacing: 12) {
-                        PlannerSearchField(text: $search)
-                        Button("Done", action: finishSearch).keyboardShortcut(.cancelAction)
-                    }
-                    .padding(.horizontal, 40).padding(.top, 37).padding(.bottom, 14)
-                } else {
-                    HStack(spacing: 8) {
-                        Image(systemName: section.systemImage).foregroundStyle(section.tint)
-                        Text(section.label).fontWeight(.bold)
-                        Spacer()
-                        Button(action: startSearch) { Image(systemName: "magnifyingglass") }
-                            .accessibilityLabel("Search")
-                        Menu {
-                            Button("New Task") { editing = PlannerItem(title: "") }
-                            Button("Quick Capture") { quickCapture = true }
-                        } label: { Image(systemName: "ellipsis") }
-                        .menuIndicator(.hidden).fixedSize()
-                        .accessibilityLabel("More actions")
-                    }
-                    .font(.system(size: 24))
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 44).padding(.top, 38).padding(.bottom, 20)
+                HStack(spacing: 8) {
+                    Image(systemName: section.systemImage).foregroundStyle(section.tint)
+                    Text(section.label).fontWeight(.bold)
+                    Spacer()
+                    Button(action: startSearch) { Image(systemName: "magnifyingglass") }
+                        .accessibilityLabel("Search")
+                    Menu {
+                        Button("New Task") { editing = PlannerItem(title: "") }
+                        Button("Quick Capture") { quickCapture = true }
+                    } label: { Image(systemName: "ellipsis") }
+                    .menuIndicator(.hidden).fixedSize()
+                    .accessibilityLabel("More actions")
                 }
-                if !isSearching && (section == .history || section == .trash) {
+                .font(.system(size: 24))
+                .buttonStyle(.plain)
+                .padding(.horizontal, 44).padding(.top, 38).padding(.bottom, 20)
+                if section == .history || section == .trash {
                     PlannerArchiveView(section: section, store: store, onEdit: { editing = $0 })
-                } else if visibleItems.isEmpty && !isSearching {
+                } else if visibleItems.isEmpty {
                     PlannerEmptyState(section: section)
                         .padding(.bottom, 180)
                 } else {
@@ -218,15 +214,6 @@ struct ContentView: View {
                     .accessibilityElement(children: .contain)
                     .accessibilityAction { editing = item }
                     .contextMenu { Button("Open") { editing = item } }
-                }
-                if isSearching {
-                    ForEach(searchEvents) { event in
-                        Label(event.title, systemImage: "calendar")
-                            .contentShape(Rectangle())
-                            .onTapGesture(count: 2) { openEvent(event, day: event.start) }
-                            .accessibilityElement(children: .contain)
-                            .accessibilityAction { openEvent(event, day: event.start) }
-                    }
                 }
             }
             .onKeyPress(.return) {
@@ -266,13 +253,35 @@ struct ContentView: View {
         search = ""
     }
 
+    private func openSearchResult(_ result: PlannerSearchResult) {
+        finishSearch()
+        switch result {
+        case .task(let item): editing = item
+        case .event(let event): openEvent(event, day: event.start)
+        case .list(let list): showCollection(.list(list.id))
+        case .tag(let tag): showCollection(.tag(tag))
+        }
+    }
+
+    private func showCollection(_ filter: CollectionFilter) {
+        collectionToShow = filter
+        listNavigation = UUID()
+        switch filter {
+        case .list, .folder: section = .lists
+        case .tag: section = .tags
+        }
+    }
+
     private func createInSection() {
         guard !editorPresented else { return }
-        if !searching && (section == .lists || section == .tags) {
+        if searching {
+            finishSearch()
+            editing = PlannerItem(title: "")
+        } else if section == .lists || section == .tags {
             collectionRequest += 1
         } else {
             var item = PlannerItem(title: "")
-            if !searching && section == .schedule { item.day = scheduleDay }
+            if section == .schedule { item.day = scheduleDay }
             editing = item
         }
     }
@@ -292,11 +301,9 @@ struct ContentView: View {
             section = .schedule
         case .list(let id):
             guard store.lists.contains(where: { $0.id == id }) else { return }
-            listToShow = id
-            listNavigation = UUID()
-            section = .lists
+            showCollection(.list(id))
         case .search(let query):
-            searching = true
+            startSearch()
             search = query
         case .item(let id):
             if !store.items.contains(where: { $0.id == id }) { materialize(through: .now) }

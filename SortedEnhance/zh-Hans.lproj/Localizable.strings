@@ -135,6 +135,7 @@
 "Next day" = "下一天";
 "Next month" = "下个月";
 "No Folder" = "无文件夹";
+"No results" = "没有搜索结果";
 "No List" = "无列表";
 "No backups available." = "暂无备份。";
 "No calendars available." = "暂无可用日历。";
@@ -156,6 +157,7 @@
 "Planner Notes" = "计划备注";
 "Previous day" = "上一天";
 "Previous month" = "上个月";
+"Quick Search" = "快速搜索";
 "Quick Capture" = "快速录入";
 "Quick Entry" = "快速录入";
 "Redo Planner Change" = "重做计划更改";
@@ -182,6 +184,7 @@
 "Schedule options" = "计划选项";
 "Search" = "搜索";
 "Search Term" = "搜索词";
+"Search tasks, events, lists and tags." = "搜索任务、日程、列表及标签。";
 "Search tasks and events" = "搜索任务和日程";
 "Select the same folder in iCloud Drive on each Mac." = "请在每台 Mac 上选择 iCloud 云盘中的同一文件夹。";
 "Set start time" = "指定开始时间";
@@ -201,6 +204,7 @@
 "Sync Now" = "立即同步";
 "Sync folder" = "同步文件夹";
 "System" = "跟随系统";
+"Tag" = "标签";
 "Tags" = "标签";
 "Task" = "任务";
 "Task List" = "任务列表";

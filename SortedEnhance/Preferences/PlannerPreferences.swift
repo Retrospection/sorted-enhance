@@ -76,6 +76,7 @@ struct PlannerSettingsView: View {
             }
         }
         .frame(width: 620, height: 680)
+        .background(SettingsWindowControls())
         .foregroundStyle(.white)
         .background(Color(red: 0.153, green: 0.204, blue: 0.267))
         .environment(\.colorScheme, .dark)
@@ -213,5 +214,21 @@ struct PlannerPreferencesModifier: ViewModifier {
             .environment(\.defaultMinListRowHeight, rowSize.minimumHeight(default: defaultRowHeight))
             .environment(\.locale, clock.locale(from: locale))
             .environment(\.calendar, displayedCalendar)
+    }
+}
+
+
+private struct SettingsWindowControls: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { WindowObserver() }
+    func updateNSView(_ view: NSView, context: Context) {}
+
+    private final class WindowObserver: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            for control in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+                window?.standardWindowButton(control)?.isHidden = true
+            }
+            window?.isMovableByWindowBackground = true
+        }
     }
 }

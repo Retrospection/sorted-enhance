@@ -30,7 +30,7 @@ private struct CollectionCount {
     }
 }
 
-private enum CollectionFilter: Hashable {
+enum CollectionFilter: Hashable {
     case folder(UUID), list(UUID), tag(String)
 }
 
@@ -62,7 +62,6 @@ struct OrganizationView: View {
     let section: OrganizationSection
     let onSearch: () -> Void
     let newCollectionSignal: Int
-    let initialListID: UUID?
     @State private var filter: CollectionFilter?
     @State private var selected = Set<UUID>()
     @State private var editing: CollectionEdit?
@@ -70,14 +69,13 @@ struct OrganizationView: View {
     @State private var mergeError: String?
 
     init(store: PlannerStore, section: OrganizationSection, onEdit: @escaping (PlannerItem) -> Void,
-         onSearch: @escaping () -> Void, newCollectionSignal: Int, initialListID: UUID? = nil) {
+         onSearch: @escaping () -> Void, newCollectionSignal: Int, initialFilter: CollectionFilter? = nil) {
         self.section = section
         self.onSearch = onSearch
         self.newCollectionSignal = newCollectionSignal
-        self.initialListID = initialListID
         self.store = store
         self.onEdit = onEdit
-        _filter = State(initialValue: initialListID.map(CollectionFilter.list))
+        _filter = State(initialValue: initialFilter)
     }
 
     private var active: [PlannerItem] {
@@ -119,9 +117,6 @@ struct OrganizationView: View {
         .background(Color(nsColor: .textBackgroundColor))
         .onChange(of: filter) { selected.removeAll() }
         .onChange(of: section) { filter = nil }
-        .onChange(of: initialListID) {
-            if let initialListID { filter = .list(initialListID) }
-        }
         .onChange(of: newCollectionSignal) {
             if filter != nil {
                 newTask()

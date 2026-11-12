@@ -16,6 +16,13 @@ final class WindowCaptureTests: XCTestCase {
         XCTAssertTrue(planner.buttons["newScheduleTask"].waitForExistence(timeout: 5))
         attach(planner, named: "Schedule")
 
+        app.typeKey("f", modifierFlags: .command)
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5), app.debugDescription)
+        attach(planner, named: "QuickSearch")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(search.waitForNonExistence(timeout: 5))
+
         planner.buttons["Inbox"].click()
         let newTask = planner.buttons["New Task"]
         XCTAssertTrue(newTask.waitForExistence(timeout: 5))

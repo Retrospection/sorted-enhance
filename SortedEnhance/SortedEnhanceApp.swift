@@ -29,6 +29,8 @@ struct SortedEnhanceApp: App {
         Settings {
             PlannerSettingsView(recovery: recovery)
                 .modifier(PlannerPreferencesModifier())
+                .ignoresSafeArea(.container, edges: .top)
         }
+        .windowStyle(.hiddenTitleBar)
     }
 }

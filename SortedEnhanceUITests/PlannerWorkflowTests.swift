@@ -56,18 +56,30 @@ final class PlannerWorkflowTests: XCTestCase {
     }
 
     func testReplanAroundFixedEventAndPreserveCompletedWorkAfterRelaunch() {
-        // Run in an empty test day with a writable calendar and zero schedule buffer.
+        let runID = UUID().uuidString
+        let meeting = "Meeting " + runID
+        let outline = "Outline " + runID
+        let writing = "Write " + runID
+        let calendarName = "Sorted Enhance UI Tests"
         app.launch()
         navigate("Schedule")
-        let meeting = "Meeting \(UUID().uuidString)"
+        let day = selectEmptyDay()
+        addTeardownBlock { @MainActor in
+            self.removeFixtures([meeting, outline, writing])
+        }
         button("New Event").click()
+        let calendars = app.popUpButtons["Calendar"]
+        calendars.click()
+        let testCalendar = app.menuItems[calendarName]
+        XCTAssertTrue(testCalendar.waitForExistence(timeout: 3), "Create the disposable test calendar before running this test.")
+        testCalendar.click()
         fill("Title", with: meeting)
         fill("Start time", with: "14:00")
         fill("Duration", with: "60")
         button("Save").click()
 
-        let outline = createTask(duration: 30)
-        let writing = createTask(duration: 60)
+        createTask(title: outline, duration: 30)
+        createTask(title: writing, duration: 60)
         schedule(from: "13:00")
         assertStart("13:00", for: outline)
         assertStart("15:00", for: writing)
@@ -78,10 +90,65 @@ final class PlannerWorkflowTests: XCTestCase {
         app.terminate()
         app.launch()
         navigate("Schedule")
+        showDay(day)
         assertStart("14:00", for: meeting)
         assertStart("15:30", for: writing)
         navigate("History")
         assertStart("13:00", for: outline)
+    }
+
+    private func showDay(_ day: String) {
+        fill("Schedule date", with: day)
+        app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(app.staticTexts[day].waitForExistence(timeout: 3))
+    }
+
+    private func selectEmptyDay() -> String {
+        let calendar = Calendar(identifier: .gregorian)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.dateFormat = "yyyy-MM-dd"
+        let today = calendar.startOfDay(for: Date())
+        for offset in 1...31 {
+            let date = calendar.date(byAdding: .day, value: offset, to: today)!
+            let day = formatter.string(from: date)
+            showDay(day)
+            if app.staticTexts["No scheduled items"].waitForExistence(timeout: 1) {
+                return day
+            }
+        }
+        XCTFail("No empty schedule day found in the next month.")
+        return ""
+    }
+
+    private func removeFixtures(_ titles: [String]) {
+        continueAfterFailure = true
+        for title in titles {
+            // Reset navigation even if cleanup of the preceding item failed.
+            app.terminate()
+            app.launch()
+            app.typeKey("f", modifierFlags: .command)
+            let search = app.searchFields.firstMatch
+            guard search.waitForExistence(timeout: 3) else {
+                XCTFail("Could not search for fixture " + title)
+                continue
+            }
+            search.click()
+            search.typeKey("a", modifierFlags: .command)
+            search.typeText(title)
+            let result = task(title)
+            if result.waitForExistence(timeout: 3) {
+                result.doubleClick()
+                let delete = app.buttons["Delete"]
+                if delete.waitForExistence(timeout: 3) {
+                    delete.click()
+                    XCTAssertTrue(result.waitForNonExistence(timeout: 3), "Fixture still visible: " + title)
+                } else {
+                    XCTFail("Could not remove fixture " + title)
+                }
+            }
+        }
     }
 
     private func navigate(_ name: String) {
@@ -90,8 +157,8 @@ final class PlannerWorkflowTests: XCTestCase {
         destination.click()
     }
 
-    private func createTask(duration: Int? = nil) -> String {
-        let title = "Task \(UUID().uuidString)"
+    @discardableResult
+    private func createTask(title: String = "Task " + UUID().uuidString, duration: Int? = nil) -> String {
         button("New Task").click()
         fill("Title", with: title)
         if let duration {
@@ -134,6 +201,7 @@ final class PlannerWorkflowTests: XCTestCase {
     private func schedule(from time: String) {
         button("Auto Schedule").click()
         fill("Schedule from", with: time)
+        fill("Buffer", with: "0")
         button("Apply").click()
     }
 

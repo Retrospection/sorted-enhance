@@ -197,6 +197,8 @@ struct DailyScheduleView: View {
                 .contentShape(Rectangle())
                 .tag(row.entry.id)
                 .onTapGesture(count: 2) { edit(row.entry) }
+                .accessibilityElement(children: .contain)
+                .accessibilityAction { edit(row.entry) }
             }
         }
         .overlay { if rows.isEmpty { Text("No scheduled items").foregroundStyle(.secondary) } }

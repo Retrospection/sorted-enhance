@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PlannerAppGroup</key>
+    <string>$(TeamIdentifierPrefix)local.sorted-enhance.shared</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER).planner</string>
+            <key>CFBundleURLSchemes</key>
+            <array><string>sorted-enhance</string></array>
+        </dict>
+    </array>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Show and edit the calendars you select in your schedule.</string>
+</dict>
+</plist>

@@ -2,7 +2,6 @@ name: macOS CI and release
 
 on:
   pull_request:
-    branches: [main]
   push:
     branches: [main]
     tags: ['v*']
@@ -31,6 +30,15 @@ jobs:
           xcodebuild -project SortedEnhance.xcodeproj -scheme SortedEnhance \
             -configuration Debug -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath "$RUNNER_TEMP/debug" build-for-testing
+      - name: Run task workflows on the hosted Mac
+        run: |
+          xcodebuild -project SortedEnhance.xcodeproj -scheme SortedEnhance \
+            -destination 'platform=macOS,arch=arm64' -derivedDataPath "$RUNNER_TEMP/debug" \
+            -parallel-testing-enabled NO \
+            -skip-testing:SortedEnhanceUITests/PlannerWorkflowTests/testReplanAroundFixedEventAndPreserveCompletedWorkAfterRelaunch \
+            test-without-building
+      - name: Run planner tests
+        run: scripts/test-planner.sh
       - name: Build and inspect universal package
         env:
           VERSION_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}

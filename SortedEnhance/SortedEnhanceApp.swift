@@ -4,10 +4,11 @@ import SwiftUI
 struct SortedEnhanceApp: App {
     @StateObject private var store = PlannerStore.shared
 
+    private let widgetUpdates = PlannerWidgetUpdates(store: PlannerStore.shared)
     @StateObject private var recovery = PlannerRecovery(store: PlannerStore.shared)
 
     var body: some Scene {
-        WindowGroup("Sorted Enhance") {
+        Window("Sorted Enhance", id: "planner") {
             ContentView(store: store)
                 .onAppear { recovery.refresh() }
         }

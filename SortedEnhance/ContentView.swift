@@ -85,10 +85,20 @@ struct ContentView: View {
         )) { Button("OK") { store.errorMessage = nil } } message: {
             Text(store.errorMessage ?? "")
         }
+        .onOpenURL(perform: openLink)
+        .onReceive(DistributedNotificationCenter.default().publisher(for: SharedCapture.notification)) { _ in
+            store.importSharedCaptures()
+        }
         .plannerNotifications(for: store.items)
-        .onAppear { materialize(through: .now) }
+        .onAppear {
+            store.importSharedCaptures()
+            materialize(through: .now)
+        }
         .onChange(of: phase) {
-            if phase == .active { materialize(through: .now) }
+            if phase == .active {
+                store.importSharedCaptures()
+                materialize(through: .now)
+            }
         }
         .frame(minWidth: 660, minHeight: 430)
     }
@@ -152,6 +162,32 @@ struct ContentView: View {
         case .history: "Completed and canceled tasks appear here."
         case .trash: "Deleted tasks appear here."
         default: "Create a task to add it to your inbox."
+        }
+    }
+
+    private func openLink(_ url: URL) {
+        guard let link = PlannerLink(url: url) else { return }
+        switch link {
+        case .today:
+            editing = nil
+            quickCapture = false
+            eventToEdit = nil
+            search = ""
+            scheduleDay = .now
+            section = .schedule
+        case .item(let id):
+            guard let item = store.items.first(where: { $0.id == id }) else { return }
+            eventToEdit = nil
+            quickCapture = false
+            editing = item
+        case .add(let title, let notes):
+            var item = PlannerItem(title: title)
+            item.notes = notes
+            if store.save(item) {
+                section = .inbox
+                search = ""
+                selectedTask = item.id
+            }
         }
     }
 

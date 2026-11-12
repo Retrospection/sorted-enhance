@@ -64,3 +64,27 @@ recurring.recurrence?.interval = 2
 let alternate = PlannerAlert.plan(for: [recurring], now: beforeMonday)
 precondition(alternate.contains { $0.date == monday.addingTimeInterval(12 * 86400 - 900) })
 precondition(!alternate.contains { $0.date == monday.addingTimeInterval(11 * 86400 - 900) })
+
+let laterTasks = (0..<70).map { i in
+    var item = PlannerItem(title: "Later \(i)")
+    item.start = monday.addingTimeInterval(86400 * 150 + Double(i * 60))
+    item.reminderOffsetMinutes = 0
+    return item
+}
+let crowded = PlannerAlert.plan(for: [recurring] + laterTasks, now: beforeMonday)
+precondition(crowded.count == 64)
+precondition(crowded.map(\.date) == (0..<64).map { monday.addingTimeInterval(Double($0) * 2 * 86400 - 900) })
+let refilled = PlannerAlert.plan(for: [recurring] + laterTasks, now: monday)
+precondition(refilled.count == 64)
+precondition(refilled.last?.date == monday.addingTimeInterval(64 * 2 * 86400 - 900))
+
+var retired = recurring
+retired.id = UUID()
+retired.title = "Removed title"
+retired.reminderOffsetMinutes = nil
+retired.start = monday.addingTimeInterval(2 * 86400 * 7)
+retired.occurrenceIndex = 7
+retired.deleted = true
+let restarted = PlannerAlert.plan(for: [recurring, retired], now: beforeMonday)
+precondition(restarted.contains { $0.title == "Morning review" && $0.date == monday.addingTimeInterval(16 * 86400 - 900) })
+precondition(!restarted.contains { $0.date == retired.start!.addingTimeInterval(-900) })

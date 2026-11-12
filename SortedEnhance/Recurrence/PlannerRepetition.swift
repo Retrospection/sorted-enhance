@@ -16,6 +16,7 @@ enum PlannerRepetition {
         if original.seriesID == nil {
             guard var rule = edited.recurrence else { return [edited] }
             var first = edited
+            first.revisionDefaults = PlannerOccurrenceDefaults(edited)
             first.seriesID = first.id
             first.occurrenceIndex = 0
             anchor(&rule, on: &first)
@@ -23,22 +24,38 @@ enum PlannerRepetition {
         }
         guard let index = original.occurrenceIndex else { return [edited] }
         let siblings = items.filter { $0.seriesID == original.seriesID }
+        // Freeze a legacy revision before an edit can overwrite the only surviving baseline.
+        var legacyOwner: PlannerItem?
+        if let oldRule = original.recurrence {
+            let revision = siblings.filter { $0.recurrence == oldRule }
+            if !revision.contains(where: { $0.revisionDefaults != nil }),
+               var owner = revision.min(by: { ($0.occurrenceIndex ?? 0) < ($1.occurrenceIndex ?? 0) }),
+               let source = oldRule.template(in: revision) {
+                owner.revisionDefaults = PlannerOccurrenceDefaults(source)
+                legacyOwner = owner
+            }
+        }
         if scope == .occurrence {
-            // Keep a clean template beyond a one-off change to the last occurrence.
-            let isTail = !siblings.contains { ($0.occurrenceIndex ?? 0) > index }
-            let extra = isTail ? following(original, through: now) : []
             var occurrence = edited
             occurrence.recurrence = original.recurrence
-            return [occurrence] + extra
+            occurrence.revisionDefaults = original.revisionDefaults
+            if let owner = legacyOwner {
+                if owner.id != occurrence.id { return [owner, occurrence] }
+                occurrence.revisionDefaults = owner.revisionDefaults
+            }
+            return [occurrence]
         }
 
+        let retained = legacyOwner.flatMap { ($0.occurrenceIndex ?? 0) < index ? [$0] : nil } ?? []
         var first = edited
         let later = siblings.filter { ($0.occurrenceIndex ?? 0) > index }
         guard !edited.deleted, var rule = first.recurrence else {
             first.recurrence = nil
-            return [first] + later.map { item in
+            first.revisionDefaults = nil
+            return retained + [first] + later.map { item in
                 var stopped = item
                 stopped.recurrence = nil
+                stopped.revisionDefaults = nil
                 if stopped.status == .active { stopped.deleted = true }
                 return stopped
             }
@@ -46,14 +63,16 @@ enum PlannerRepetition {
         if first.day != original.day || first.start != original.start || rule != original.recurrence {
             anchor(&rule, on: &first)
         }
+        first.revisionDefaults = PlannerOccurrenceDefaults(first)
         rule.revisionIndex = index
         first.recurrence = rule
         let generated = following(first, through: now, including: later.compactMap(\.occurrenceIndex))
         let byIndex = Dictionary(grouping: later, by: \.occurrenceIndex)
-        return [first] + generated.map { next in
+        return retained + [first] + generated.map { next in
             guard var existing = byIndex[next.occurrenceIndex]?.first else { return next }
             if existing.status != .active || existing.deleted {
                 existing.recurrence = rule
+                existing.revisionDefaults = nil
                 return existing
             }
             var replacement = next
@@ -123,6 +142,7 @@ enum PlannerRepetition {
         return indices.compactMap { index in
             guard let date = rule.date(at: index) else { return nil }
             var item = template
+            item.revisionDefaults = nil
             item.id = occurrenceID(seriesID: seriesID, index: index)
             item.occurrenceIndex = index
             item.day = calendar.startOfDay(for: date)

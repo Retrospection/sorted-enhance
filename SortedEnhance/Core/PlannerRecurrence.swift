@@ -18,12 +18,18 @@ struct PlannerRecurrence: Codable, Hashable, Sendable {
         timeZoneID = timeZone.identifier
     }
 
-    // Tombstones and completed exceptions retain the content of their original occurrence.
     func template(in members: [PlannerItem]) -> PlannerItem? {
-        let revision = members.filter { $0.recurrence == self && !$0.deleted }
-        let active = revision.filter { $0.status == .active }
-        return (active.isEmpty ? revision : active).max {
-            ($0.occurrenceIndex ?? -1) < ($1.occurrenceIndex ?? -1)
+        let revision = members.filter { $0.recurrence == self }
+        if let owner = revision.first(where: { $0.revisionDefaults != nil }),
+           let defaults = owner.revisionDefaults {
+            return defaults.applying(to: owner)
+        }
+        // Older snapshots did not store revision defaults. Prefer the earliest surviving
+        // active member until the next edit freezes the best available baseline.
+        let surviving = revision.filter { !$0.deleted }
+        let active = surviving.filter { $0.status == .active }
+        return (active.isEmpty ? surviving : active).min {
+            ($0.occurrenceIndex ?? Int.max) < ($1.occurrenceIndex ?? Int.max)
         }
     }
 
@@ -65,5 +71,47 @@ struct PlannerRecurrence: Codable, Hashable, Sendable {
         let (index, overflow) = anchorIndex.addingReportingOverflow(steps / interval)
         guard !overflow, index < Int.max, let occurrence = date(at: index) else { return nil }
         return occurrence > instant ? index : index + 1
+    }
+}
+
+/// Content inherited by new occurrences. Store one copy on the revision's first member.
+struct PlannerOccurrenceDefaults: Codable, Hashable, Sendable {
+    let title: String
+    let notes: String
+    let richNotes: Data?
+    let attachments: [PlannerAttachment]?
+    let hasStartTime: Bool
+    let duration: Int
+    let locked: Bool
+    let listID: UUID?
+    let tags: [String]
+    let reminderOffsetMinutes: Int?
+
+    init(_ item: PlannerItem) {
+        title = item.title
+        notes = item.notes
+        richNotes = item.richNotes
+        attachments = item.attachments
+        hasStartTime = item.start != nil
+        duration = item.duration
+        locked = item.locked
+        listID = item.listID
+        tags = item.tags
+        reminderOffsetMinutes = item.reminderOffsetMinutes
+    }
+
+    func applying(to owner: PlannerItem) -> PlannerItem {
+        var template = owner
+        template.title = title
+        template.notes = notes
+        template.richNotes = richNotes
+        template.attachments = attachments
+        template.start = hasStartTime ? owner.recurrence?.anchor : nil
+        template.duration = duration
+        template.locked = locked
+        template.listID = listID
+        template.tags = tags
+        template.reminderOffsetMinutes = reminderOffsetMinutes
+        return template
     }
 }

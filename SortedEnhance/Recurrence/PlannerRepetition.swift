@@ -91,28 +91,8 @@ enum PlannerRepetition {
     private static func anchor(_ rule: inout PlannerRecurrence, on item: inout PlannerItem) {
         rule.anchor = item.start ?? item.day ?? rule.anchor
         rule.anchorIndex = item.occurrenceIndex ?? 0
-        item.day = calendar(for: rule).startOfDay(for: rule.anchor)
+        item.day = rule.calendar.startOfDay(for: rule.anchor)
         item.recurrence = rule
-    }
-
-    private static func calendar(for rule: PlannerRecurrence) -> Calendar {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: rule.timeZoneID) ?? .current
-        return calendar
-    }
-
-    static func occurrenceDate(_ rule: PlannerRecurrence, index: Int) -> Date? {
-        guard index >= rule.anchorIndex, rule.anchorIndex >= 0, rule.interval > 0 else { return nil }
-        let (distance, overflow) = (index - rule.anchorIndex).multipliedReportingOverflow(by: rule.interval)
-        guard !overflow else { return nil }
-        let component: Calendar.Component
-        switch rule.frequency {
-        case .daily: component = .day
-        case .weekly: component = .weekOfYear
-        case .monthly: component = .month
-        case .yearly: component = .year
-        }
-        return calendar(for: rule).date(byAdding: component, value: distance, to: rule.anchor)
     }
 
     private static func following(
@@ -129,34 +109,17 @@ enum PlannerRepetition {
 
     // Generate a bounded window. Selecting an older date can fill that part of the series later.
     private static func window(for rule: PlannerRecurrence, around date: Date) -> [Int] {
-        guard rule.interval > 0, rule.anchorIndex >= 0 else { return [] }
-        let calendar = calendar(for: rule)
-        let component: Calendar.Component
-        switch rule.frequency {
-        case .daily, .weekly: component = .day
-        case .monthly: component = .month
-        case .yearly: component = .year
-        }
-        guard let anchor = calendar.dateInterval(of: component, for: rule.anchor)?.start,
-              let target = calendar.dateInterval(of: component, for: date)?.start,
-              let units = calendar.dateComponents([component], from: anchor, to: target).value(for: component)
-        else { return [] }
-        let step = rule.frequency == .weekly ? units / 7 : units
-        let (candidate, overflow) = rule.anchorIndex.addingReportingOverflow(step / rule.interval)
-        guard !overflow, candidate >= rule.anchorIndex, candidate < Int.max - 3 else { return [] }
-        var index = candidate
-        if let occurrence = occurrenceDate(rule, index: index), occurrence > date {
-            index -= 1
-        }
+        guard let next = rule.firstIndex(after: date), next < Int.max - 3 else { return [] }
+        let index = next - 1
         // Include missed work near the selected date and three upcoming occurrences.
         return Array(max(rule.anchorIndex, index - 31)...(index + 3))
     }
 
     private static func occurrences(_ template: PlannerItem, indices: [Int]) -> [PlannerItem] {
         guard let rule = template.recurrence, let seriesID = template.seriesID else { return [] }
-        let calendar = calendar(for: rule)
+        let calendar = rule.calendar
         return indices.compactMap { index in
-            guard let date = occurrenceDate(rule, index: index) else { return nil }
+            guard let date = rule.date(at: index) else { return nil }
             var item = template
             item.id = occurrenceID(seriesID: seriesID, index: index)
             item.occurrenceIndex = index

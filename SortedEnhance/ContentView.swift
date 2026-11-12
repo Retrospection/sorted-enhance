@@ -102,6 +102,7 @@ struct ContentView: View {
                     .tag(item.id)
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) { editing = item }
+                    .accessibilityElement(children: .contain)
                     .accessibilityAction { editing = item }
                     .contextMenu { Button("Open") { editing = item } }
                 }

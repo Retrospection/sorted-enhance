@@ -16,11 +16,11 @@
             productRefGroup = 0A3E27B8CA818264D75C8D81 /* products */;
             projectDirPath = "";
             projectRoot = "";
-            targets = (A172CEDCAE47474B615C54D5 /* app */);
+            targets = (A172CEDCAE47474B615C54D5 /* app */, 000000000000000000000011);
         };
-        4813494D137E1631BBA301D5 /* root */ = { isa = PBXGroup; children = (26528A5FC3CFAE9924D0FA33 /* sourceGroup */, 0A3E27B8CA818264D75C8D81 /* products */); sourceTree = "<group>"; };
+        4813494D137E1631BBA301D5 /* root */ = { isa = PBXGroup; children = (26528A5FC3CFAE9924D0FA33 /* sourceGroup */, 000000000000000000000012, 0A3E27B8CA818264D75C8D81 /* products */); sourceTree = "<group>"; };
         26528A5FC3CFAE9924D0FA33 /* sourceGroup */ = { isa = PBXFileSystemSynchronizedRootGroup; path = SortedEnhance; sourceTree = "<group>"; };
-        0A3E27B8CA818264D75C8D81 /* products */ = { isa = PBXGroup; children = (A8792157CB4F27FB949C035F /* product */); name = Products; sourceTree = "<group>"; };
+        0A3E27B8CA818264D75C8D81 /* products */ = { isa = PBXGroup; children = (A8792157CB4F27FB949C035F /* product */, 000000000000000000000013); name = Products; sourceTree = "<group>"; };
         A8792157CB4F27FB949C035F /* product */ = { isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SortedEnhance.app; sourceTree = BUILT_PRODUCTS_DIR; };
         A172CEDCAE47474B615C54D5 /* app */ = {
             isa = PBXNativeTarget;
@@ -93,6 +93,46 @@
                 ENABLE_APP_SANDBOX = YES;
                 ENABLE_HARDENED_RUNTIME = YES;
                 ENABLE_PREVIEWS = YES;
+            };
+            name = Release;
+        };
+
+        000000000000000000000011 /* SortedEnhanceUITests */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = 000000000000000000000014;
+            buildPhases = (000000000000000000000015);
+            dependencies = (000000000000000000000016);
+            fileSystemSynchronizedGroups = (000000000000000000000012);
+            name = SortedEnhanceUITests;
+            productName = SortedEnhanceUITests;
+            productReference = 000000000000000000000013;
+            productType = "com.apple.product-type.bundle.ui-testing";
+        };
+        000000000000000000000012 = { isa = PBXFileSystemSynchronizedRootGroup; path = SortedEnhanceUITests; sourceTree = "<group>"; };
+        000000000000000000000013 = { isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = SortedEnhanceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+        000000000000000000000014 = { isa = XCConfigurationList; buildConfigurations = (000000000000000000000017, 000000000000000000000018); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+        000000000000000000000015 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        000000000000000000000016 = { isa = PBXTargetDependency; target = A172CEDCAE47474B615C54D5; targetProxy = 000000000000000000000019; };
+        000000000000000000000019 = { isa = PBXContainerItemProxy; containerPortal = 244210E48437B6556980A702; proxyType = 1; remoteGlobalIDString = A172CEDCAE47474B615C54D5; remoteInfo = SortedEnhance; };
+        000000000000000000000017 = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CODE_SIGN_IDENTITY = "-";
+                GENERATE_INFOPLIST_FILE = YES;
+                PRODUCT_BUNDLE_IDENTIFIER = local.sorted-enhance.SortedEnhanceUITests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                TEST_TARGET_NAME = SortedEnhance;
+            };
+            name = Debug;
+        };
+        000000000000000000000018 = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CODE_SIGN_IDENTITY = "-";
+                GENERATE_INFOPLIST_FILE = YES;
+                PRODUCT_BUNDLE_IDENTIFIER = local.sorted-enhance.SortedEnhanceUITests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                TEST_TARGET_NAME = SortedEnhance;
             };
             name = Release;
         };

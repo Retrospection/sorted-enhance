@@ -3,6 +3,7 @@ import SwiftUI
 struct TaskEditorView: View {
     @ObservedObject var store: PlannerStore
     @Environment(\.dismiss) private var dismiss
+    @State private var openingItem: PlannerItem?
     @State private var draft: PlannerItem
     @State private var timeText: String
     @State private var durationText: String
@@ -13,6 +14,7 @@ struct TaskEditorView: View {
 
     init(item: PlannerItem, store: PlannerStore) {
         self.store = store
+        _openingItem = State(initialValue: store.items.contains { $0.id == item.id } ? item : nil)
         _draft = State(initialValue: item)
         _timeText = State(initialValue: item.start.map(Self.formatTime) ?? "")
         _durationText = State(initialValue: String(item.duration))
@@ -31,9 +33,7 @@ struct TaskEditorView: View {
                     if !timeText.isEmpty {
                         TaskAlertPicker(item: $draft)
                     }
-                    PlannerNoteEditor(notes: $draft.notes, richNotes: $draft.richNotes) {
-                        extractedTitles.append(contentsOf: $0)
-                    }
+                    PlannerNoteEditor(notes: $draft.notes, richNotes: $draft.richNotes, extractedTitles: $extractedTitles)
                     if !extractedTitles.isEmpty {
                         Text("New tasks: " + extractedTitles.joined(separator: ", ")).font(.callout)
                     }
@@ -151,7 +151,15 @@ struct TaskEditorView: View {
             item.start = time
             item.day = day
         }
-        let original = store.items.first { $0.id == item.id } ?? item
+        let current = store.items.first { $0.id == item.id }
+        if let openingItem, openingItem.id == item.id {
+            do { item = try PlannerItemEdit.reconcile(item, opening: openingItem, current: current) }
+            catch {
+                validationMessage = error.localizedDescription
+                return
+            }
+        }
+        let original = current ?? item
         var changes = PlannerRepetition.edit(item, original: original, in: store.items, scope: scope ?? repeatScope)
         for title in extractedTitles {
             var child = PlannerItem(title: title)

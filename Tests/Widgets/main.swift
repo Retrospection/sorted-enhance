@@ -25,3 +25,26 @@ library.items[0].status = .completed
 _ = try WidgetSnapshot.export(library, to: file)
 let afterCompletion = try JSONDecoder().decode(WidgetSnapshot.self, from: Data(contentsOf: file))
 precondition(afterCompletion.tasks.isEmpty)
+
+// Keep the exported file fixed while the widget advances beyond the app's last generated week.
+let anchor = ISO8601DateFormatter().date(from: "2026-01-01T10:00:00Z")!
+var utc = Calendar(identifier: .gregorian)
+utc.timeZone = TimeZone(secondsFromGMT: 0)!
+var weekly = PlannerItem(title: "Stand-up")
+weekly.day = utc.startOfDay(for: anchor)
+weekly.start = anchor
+weekly.recurrence = PlannerRecurrence(frequency: .weekly, anchor: anchor, timeZone: utc.timeZone)
+let members = PlannerRepetition.edit(weekly, original: PlannerItem(title: weekly.title), in: [], scope: .future, now: anchor)
+_ = try WidgetSnapshot.export(PlannerSnapshot(items: members), to: file)
+let frozen = try JSONDecoder().decode(WidgetSnapshot.self, from: Data(contentsOf: file))
+let weekTen = utc.date(byAdding: .weekOfYear, value: 10, to: anchor)!
+let result = frozen.tasks(on: weekTen, calendar: utc)
+precondition(result.count == 1 && result[0].title == "Stand-up" && result[0].start == weekTen)
+let materialized = PlannerRepetition.upcoming(in: members, through: weekTen).first { $0.start == weekTen }!
+precondition(result[0].link.lastPathComponent == materialized.id.uuidString)
+
+var skipped = materialized
+skipped.status = .canceled
+_ = try WidgetSnapshot.export(PlannerSnapshot(items: members + [skipped]), to: file)
+let afterSkip = try JSONDecoder().decode(WidgetSnapshot.self, from: Data(contentsOf: file))
+precondition(afterSkip.tasks(on: weekTen, calendar: utc).isEmpty)

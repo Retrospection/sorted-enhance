@@ -11,13 +11,14 @@ for main in Tests/*/main.swift; do
     sources=(SortedEnhance/Core/*.swift)
     case "$suite" in
         Core) ;;
+        Calendar) sources+=(SortedEnhance/Calendar/EventAnnotation.swift) ;;
         Capture) sources+=(SortedEnhance/Capture/{QuickEntry,PlannerNotifications}.swift) ;;
         Integrations) sources=(SortedEnhance/Integrations/PlannerLink.swift) ;;
         Organization) sources+=(SortedEnhance/Organization/TaskMerge.swift) ;;
         Recurrence) sources+=(SortedEnhance/Recurrence/PlannerRepetition.swift) ;;
         Recovery) sources+=(SortedEnhance/Recovery/{SyncDocument,RecoveryFiles}.swift) ;;
         Schedule) sources+=(SortedEnhance/Schedule/DayPlanner.swift) ;;
-        Widgets) sources+=(SortedEnhance/Widgets/{WidgetSnapshot,WidgetExport}.swift) ;;
+        Widgets) sources+=(SortedEnhance/Recurrence/PlannerRepetition.swift SortedEnhance/Widgets/{WidgetSnapshot,WidgetExport}.swift) ;;
         *) echo "Unknown test suite: $suite" >&2; exit 1 ;;
     esac
 

@@ -4,7 +4,8 @@ import EventKit
 import Foundation
 
 struct PlannerCalendarEvent: Identifiable, Hashable {
-    let id: String
+    let annotationIdentity: EventAnnotationIdentity
+    var id: String { "\(annotationIdentity.localID):\(annotationIdentity.occurrenceKey)" }
     let calendarID: String
     let calendarTitle: String
     let title: String
@@ -20,9 +21,10 @@ struct PlannerCalendarEvent: Identifiable, Hashable {
         let calendar = event.calendar!
         calendarID = calendar.calendarIdentifier
         calendarTitle = calendar.title
-        let occurrence: Date? = event.occurrenceDate
-        let occurrenceKey = occurrence.map { String($0.timeIntervalSinceReferenceDate) } ?? "single"
-        id = "\(event.calendarItemIdentifier):\(occurrenceKey)"
+        annotationIdentity = EventAnnotationIdentity(localID: event.calendarItemIdentifier,
+            externalID: event.calendarItemExternalIdentifier, sourceID: calendar.source.sourceIdentifier,
+            calendarID: calendarID, occurrence: event.occurrenceDate, floating: event.isAllDay || event.timeZone == nil,
+            timeZone: .current)
         title = event.title ?? ""
         start = event.startDate
         end = event.endDate
@@ -130,6 +132,16 @@ final class SystemCalendarStore: ObservableObject {
             .filter { $0.status != .canceled && $0.startDate < interval.end && $0.endDate > interval.start }
             .map(PlannerCalendarEvent.init)
             .sorted { ($0.start, $0.id) < ($1.start, $1.id) }
+    }
+
+    func annotation(for event: PlannerCalendarEvent) throws -> EventAnnotation {
+        let identity = event.annotationIdentity
+        let localIDs = identity.externalID.map { externalID in
+            Set(database.calendarItems(withExternalIdentifier: externalID)
+                .filter { $0.calendar.calendarIdentifier == identity.calendarID }
+                .map(\.calendarItemIdentifier))
+        }
+        return try EventAnnotationStore.applicationStore().load(identity, uniqueProviderMatch: localIDs == [identity.localID])
     }
 
     private func current(_ snapshot: PlannerCalendarEvent) throws -> EKEvent {

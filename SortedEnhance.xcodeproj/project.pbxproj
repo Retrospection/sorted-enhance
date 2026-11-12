@@ -75,6 +75,8 @@
                 CURRENT_PROJECT_VERSION = 1;
                 CODE_SIGN_IDENTITY = "-";
                 ENABLE_USER_SELECTED_FILES = readonly;
+                ENABLE_RESOURCE_ACCESS_CALENDARS = YES;
+                INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Show and edit the calendars you select in your schedule.";
                 ENABLE_APP_SANDBOX = YES;
                 ENABLE_HARDENED_RUNTIME = YES;
                 ENABLE_PREVIEWS = YES;
@@ -92,6 +94,8 @@
                 CURRENT_PROJECT_VERSION = 1;
                 CODE_SIGN_IDENTITY = "-";
                 ENABLE_USER_SELECTED_FILES = readonly;
+                ENABLE_RESOURCE_ACCESS_CALENDARS = YES;
+                INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Show and edit the calendars you select in your schedule.";
                 ENABLE_APP_SANDBOX = YES;
                 ENABLE_HARDENED_RUNTIME = YES;
                 ENABLE_PREVIEWS = YES;

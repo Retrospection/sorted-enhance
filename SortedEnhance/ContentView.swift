@@ -3,6 +3,7 @@ import AppKit
 
 private enum PlannerSection: String, CaseIterable, Identifiable {
     case inbox = "Inbox"
+    case schedule = "Schedule"
     case collections = "Lists & Tags"
     case history = "History"
     case trash = "Trash"
@@ -12,6 +13,7 @@ private enum PlannerSection: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .inbox: "tray"
+        case .schedule: "calendar"
         case .collections: "folder"
         case .history: "clock.arrow.circlepath"
         case .trash: "trash"
@@ -25,6 +27,10 @@ struct ContentView: View {
     @State private var search = ""
     @State private var editing: PlannerItem?
     @State private var quickCapture = false
+    @State private var scheduleDay = Date.now
+    @StateObject private var calendars = SystemCalendarStore()
+    @State private var eventToEdit: PlannerCalendarEvent?
+    @State private var searchEvents: [PlannerCalendarEvent] = []
     @State private var selectedTask: UUID?
     @Environment(\.scenePhase) private var phase
 
@@ -56,7 +62,7 @@ struct ContentView: View {
             detail
                 .navigationTitle(isSearching ? "Search" : section?.rawValue ?? "Inbox")
                 .toolbar {
-                    Group {
+                    if section != .schedule || isSearching {
                         Button("New Task", systemImage: "plus") { editing = PlannerItem(title: "") }
                             .keyboardShortcut("n", modifiers: [.command, .shift])
                     }
@@ -64,8 +70,13 @@ struct ContentView: View {
                         .keyboardShortcut("k", modifiers: .command)
                 }
         }
-        .searchable(text: $search, placement: .toolbar, prompt: "Search tasks")
+        .searchable(text: $search, placement: .toolbar, prompt: "Search tasks and events")
         .onChange(of: section) { search = "" }
+        .onChange(of: search) { searchEvents = calendars.search(search) }
+        .onReceive(calendars.$calendars) { _ in searchEvents = calendars.search(search) }
+        .sheet(item: $eventToEdit) { event in
+            CalendarEventEditor(store: calendars, day: event.start, event: event)
+        }
         .sheet(item: $editing) { TaskEditorView(item: $0, store: store) }
         .sheet(isPresented: $quickCapture) { QuickCaptureView(store: store) }
         .alert("Could not update planner", isPresented: Binding(
@@ -83,7 +94,14 @@ struct ContentView: View {
     }
 
     @ViewBuilder private var detail: some View {
-        if section == .collections && !isSearching {
+        if section == .schedule && !isSearching {
+            DailyScheduleView(store: store, onEdit: { editing = $0 }, onNew: { day in
+                var item = PlannerItem(title: "")
+                item.day = day
+                editing = item
+            }, initialDay: scheduleDay, onDayChange: { materialize(through: $0) })
+            .id(scheduleDay)
+        } else if section == .collections && !isSearching {
             OrganizationView(store: store, onEdit: { editing = $0 })
         } else {
             List(selection: $selectedTask) {
@@ -104,6 +122,14 @@ struct ContentView: View {
                     .onTapGesture(count: 2) { editing = item }
                     .accessibilityAction { editing = item }
                     .contextMenu { Button("Open") { editing = item } }
+                }
+                if isSearching {
+                    ForEach(searchEvents) { event in
+                        Label(event.title, systemImage: "calendar")
+                            .contentShape(Rectangle())
+                            .onTapGesture(count: 2) { eventToEdit = event }
+                            .accessibilityAction { eventToEdit = event }
+                    }
                 }
             }
             .onKeyPress(.return) {

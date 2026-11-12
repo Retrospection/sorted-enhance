@@ -59,8 +59,9 @@ struct PlannerAlert: Equatable {
         for members in series.values {
             var alerts = members.compactMap { PlannerAlert($0, now: now) }
             guard let tail = members.max(by: { ($0.occurrenceIndex ?? 0) < ($1.occurrenceIndex ?? 0) }),
-                  let rule = tail.recurrence, let seriesID = tail.seriesID, tail.start != nil,
-                  let offset = tail.reminderOffsetMinutes, offset >= 0,
+                  let rule = tail.recurrence, let seriesID = tail.seriesID,
+                  let template = rule.template(in: members), template.start != nil,
+                  let offset = template.reminderOffsetMinutes, offset >= 0,
                   let next = rule.firstIndex(after: now.addingTimeInterval(Double(offset) * 60)) else {
                 explicit += alerts
                 continue
@@ -79,26 +80,30 @@ struct PlannerAlert: Equatable {
                    let expectedFire = expected.addingTimeInterval(-Double(offset) * 60)
                    let actual = PlannerAlert(item, now: now)
                    if expectedFire <= now { return actual == nil }
-                   return actual?.date == expectedFire && actual?.title == tail.title
+                   return actual?.date == expectedFire && actual?.title == template.title
                }) {
                 let covered = Set(revision.map { Self.prefix + $0.id.uuidString })
                 alerts.removeAll { covered.contains($0.identifier) }
-                explicit.append(PlannerAlert(identifier: prefix, title: tail.title, date: firstFire, repeatingComponents: pattern))
+                explicit.append(PlannerAlert(identifier: prefix, title: template.title, date: firstFire, repeatingComponents: pattern))
             } else {
                 let occupied = Set(revision.compactMap(\.occurrenceIndex))
-                for step in 0..<requestBudget {
-                    let (i, overflow) = index.addingReportingOverflow(step)
-                    guard !overflow, let start = rule.date(at: i) else { break }
-                    if occupied.contains(i) { continue }
-                    projected.append(PlannerAlert(identifier: prefix + "." + String(i), title: tail.title,
-                                                  date: start.addingTimeInterval(-Double(offset) * 60)))
+                var candidate = index
+                var count = 0
+                while count < requestBudget, let start = rule.date(at: candidate) {
+                    if !occupied.contains(candidate) {
+                        projected.append(PlannerAlert(identifier: prefix + "." + String(candidate), title: template.title,
+                                                      date: start.addingTimeInterval(-Double(offset) * 60)))
+                        count += 1
+                    }
+                    guard candidate < Int.max else { break }
+                    candidate += 1
                 }
             }
             explicit += alerts
         }
-        projected.sort { $0.date < $1.date }
-        explicit += projected.prefix(max(0, requestBudget - explicit.count))
-        return explicit
+        explicit += projected
+        explicit.sort { ($0.date, $0.identifier) < ($1.date, $1.identifier) }
+        return Array(explicit.prefix(requestBudget))
     }
 
     private static func repeatPattern(
@@ -141,8 +146,22 @@ final class PlannerNotifications: NSObject, UNUserNotificationCenterDelegate {
     private let center = UNUserNotificationCenter.current()
     private let log = Logger(subsystem: "SortedEnhance", category: "TaskAlerts")
     private var latest: [PlannerAlert]?
-    private var desiredAlerts: [PlannerAlert] = []
+    private var items: [PlannerItem]?
+    private var refill: Task<Void, Never>?
     private var updating = false
+
+    private override init() {
+        super.init()
+        let selector = #selector(clockChanged)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: selector, name: NSWorkspace.didWakeNotification, object: nil)
+        for name in [Notification.Name.NSCalendarDayChanged, .NSSystemTimeZoneDidChange, .NSSystemClockDidChange] {
+            NotificationCenter.default.addObserver(self, selector: selector, name: name, object: nil)
+        }
+    }
+
+    @objc private nonisolated func clockChanged(_ notification: Notification) {
+        Task { @MainActor in scheduleRefresh() }
+    }
 
     static func requestPermission() async throws -> Bool {
         let granted = try await shared.center.requestAuthorization(options: [.alert, .sound])
@@ -159,13 +178,30 @@ final class PlannerNotifications: NSObject, UNUserNotificationCenterDelegate {
 
     func update(_ items: [PlannerItem]) {
         center.delegate = self
-        let now = Date()
-        desiredAlerts = PlannerAlert.plan(for: items, now: now)
+        self.items = items
         scheduleRefresh()
     }
 
     private func scheduleRefresh() {
-        latest = desiredAlerts
+        guard let items else { return }
+        let now = Date.now
+        let alerts = PlannerAlert.plan(for: items, now: now)
+        refill?.cancel()
+        if let first = alerts.first {
+            // Refill a consumed slot even when no window is active or no task changes.
+            let delay = max(1, first.date.timeIntervalSince(now) + 1)
+            refill = Task {
+                do {
+                    try await Task.sleep(for: .seconds(delay))
+                    scheduleRefresh()
+                } catch is CancellationError {
+                    return
+                } catch {
+                    log.error("Could not wait for the next task alert: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
+        latest = alerts
         guard !updating else { return }
         updating = true
         Task {

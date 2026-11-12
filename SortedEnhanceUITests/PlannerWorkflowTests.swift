@@ -56,28 +56,43 @@ final class PlannerWorkflowTests: XCTestCase {
     }
 
     func testReplanAroundFixedEventAndPreserveCompletedWorkAfterRelaunch() {
+        checkReplanning { meeting in
+            button("New Event").click()
+            let calendars = app.popUpButtons["Calendar"]
+            calendars.click()
+            let testCalendar = app.menuItems["Sorted Enhance UI Tests"]
+            XCTAssertTrue(testCalendar.waitForExistence(timeout: 3), "Create the disposable test calendar before running this test.")
+            testCalendar.click()
+            fill("Title", with: meeting)
+            fill("Start time", with: "14:00")
+            fill("Duration", with: "60")
+            button("Save").click()
+        }
+    }
+
+    func testReplanAroundLockedTaskAndPreserveCompletedWorkAfterRelaunch() {
+        checkReplanning { fixedTask in
+            button("New Task").click()
+            fill("Title", with: fixedTask)
+            fill("Start time", with: "14:00")
+            fill("Duration", with: "60")
+            app.checkBoxes["Lock time"].click()
+            button("Save").click()
+        }
+    }
+
+    private func checkReplanning(createFixedItem: (String) -> Void) {
         let runID = UUID().uuidString
-        let meeting = "Meeting " + runID
+        let fixed = "Fixed " + runID
         let outline = "Outline " + runID
         let writing = "Write " + runID
-        let calendarName = "Sorted Enhance UI Tests"
         app.launch()
         navigate("Schedule")
         let day = selectEmptyDay()
         addTeardownBlock { @MainActor in
-            self.removeFixtures([meeting, outline, writing])
+            self.removeFixtures([fixed, outline, writing])
         }
-        button("New Event").click()
-        let calendars = app.popUpButtons["Calendar"]
-        calendars.click()
-        let testCalendar = app.menuItems[calendarName]
-        XCTAssertTrue(testCalendar.waitForExistence(timeout: 3), "Create the disposable test calendar before running this test.")
-        testCalendar.click()
-        fill("Title", with: meeting)
-        fill("Start time", with: "14:00")
-        fill("Duration", with: "60")
-        button("Save").click()
-
+        createFixedItem(fixed)
         createTask(title: outline, duration: 30)
         createTask(title: writing, duration: 60)
         schedule(from: "13:00")
@@ -91,7 +106,7 @@ final class PlannerWorkflowTests: XCTestCase {
         app.launch()
         navigate("Schedule")
         showDay(day)
-        assertStart("14:00", for: meeting)
+        assertStart("14:00", for: fixed)
         assertStart("15:30", for: writing)
         navigate("History")
         assertStart("13:00", for: outline)

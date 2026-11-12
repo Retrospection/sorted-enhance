@@ -77,3 +77,10 @@ let changedSeries = PlannerRepetition.edit(
 let historical = changedSeries.first { $0.id == alreadyFinished.id }!
 precondition(historical.status == .completed && historical.notes == "Recorded work" && historical.start == date(6, 15))
 print("Recurrence contracts passed.")
+
+var retired = daily.last!
+retired.deleted = true
+retired.title = "Old series name"
+retired.reminderOffsetMinutes = 45
+let resumed = PlannerRepetition.upcoming(in: Array(daily.dropLast()) + [retired], through: date(6, 6))
+precondition(resumed.contains { $0.start == date(6, 6) && $0.title == daily[0].title && $0.reminderOffsetMinutes == nil })

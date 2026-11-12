@@ -18,6 +18,15 @@ struct PlannerRecurrence: Codable, Hashable, Sendable {
         timeZoneID = timeZone.identifier
     }
 
+    // Tombstones and completed exceptions retain the content of their original occurrence.
+    func template(in members: [PlannerItem]) -> PlannerItem? {
+        let revision = members.filter { $0.recurrence == self && !$0.deleted }
+        let active = revision.filter { $0.status == .active }
+        return (active.isEmpty ? revision : active).max {
+            ($0.occurrenceIndex ?? -1) < ($1.occurrenceIndex ?? -1)
+        }
+    }
+
     var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: timeZoneID) ?? .current

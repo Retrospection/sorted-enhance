@@ -6,6 +6,7 @@ struct DailyScheduleView: View {
     let onNew: (Date) -> Void
     let onDayChange: (Date) -> Void
     let onSearch: () -> Void
+    let onEvent: (PlannerCalendarEvent?, Date) -> Void
 
     @AppStorage("scheduleDefaultDuration") private var defaultDuration = DayPlanner.standardDuration
     @StateObject private var calendars = SystemCalendarStore()
@@ -17,24 +18,20 @@ struct DailyScheduleView: View {
     @State private var showDate = false
     @Binding private var showScheduler: Bool
     @State private var scheduleSelection: Set<UUID>?
-    @State private var eventEditor: EventEditorRequest?
     @State private var notice: String?
 
     init(store: PlannerStore, onEdit: @escaping (PlannerItem) -> Void, onNew: @escaping (Date) -> Void,
-         day: Binding<Date>, schedulerPresented: Binding<Bool>, onDayChange: @escaping (Date) -> Void, onSearch: @escaping () -> Void) {
+         day: Binding<Date>, schedulerPresented: Binding<Bool>, onDayChange: @escaping (Date) -> Void, onSearch: @escaping () -> Void,
+         onEvent: @escaping (PlannerCalendarEvent?, Date) -> Void) {
         self.store = store
         self.onEdit = onEdit
         self.onNew = onNew
         self.onDayChange = onDayChange
         self.onSearch = onSearch
+        self.onEvent = onEvent
         _day = day
         _showScheduler = schedulerPresented
         _dayInput = State(initialValue: Self.dateString(day.wrappedValue))
-    }
-
-    private struct EventEditorRequest: Identifiable {
-        let id = UUID()
-        var event: PlannerCalendarEvent?
     }
 
     private enum Entry: Identifiable {
@@ -162,9 +159,7 @@ struct DailyScheduleView: View {
                 }
             }
         }
-        .sheet(item: $eventEditor) { request in
-            CalendarEventEditor(store: calendars, day: day, event: request.event)
-        }
+
         .onChange(of: day, initial: true) { _, date in
             dayInput = Self.dateString(date)
             selection.removeAll()
@@ -202,7 +197,7 @@ struct DailyScheduleView: View {
                 .accessibilityLabel("Search")
                 .help("Search")
             Menu {
-                Button("New Event") { eventEditor = EventEditorRequest() }
+                Button("New Event") { onEvent(nil, day) }
                 Button("Auto Schedule") {
                     scheduleSelection = nil
                     showScheduler = true
@@ -393,7 +388,7 @@ struct DailyScheduleView: View {
     private func edit(_ entry: Entry) {
         switch entry {
         case .task(let item): onEdit(item)
-        case .event(let event): eventEditor = EventEditorRequest(event: event)
+        case .event(let event): onEvent(event, day)
         }
     }
 

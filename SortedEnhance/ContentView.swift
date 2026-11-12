@@ -17,11 +17,15 @@ struct ContentView: View {
     @Environment(\.openSettings) private var openSettings
     @StateObject private var calendars = SystemCalendarStore()
     @State private var eventToEdit: PlannerCalendarEvent?
+    @State private var editingEvent = false
+    @State private var eventDay = Date.now
+    @State private var eventDraft: PlannerItem?
     @State private var searchEvents: [PlannerCalendarEvent] = []
     @State private var selectedTask: UUID?
     @Environment(\.scenePhase) private var phase
 
     private var isSearching: Bool { searching }
+    private var editorPresented: Bool { editing != nil || editingEvent }
 
     private var visibleItems: [PlannerItem] {
         store.items.filter { item in
@@ -48,15 +52,17 @@ struct ContentView: View {
                                onHelp: { helpPresented = true })
                     .frame(width: min(300, max(200, geometry.size.width * 0.293)))
                     .overlay {
-                        if schedulerPresented {
+                        if schedulerPresented || editorPresented {
                             Color(nsColor: .textBackgroundColor).opacity(0.8)
-                                .onTapGesture { schedulerPresented = false }
+                                .onTapGesture { if schedulerPresented { schedulerPresented = false } }
                         }
                     }
                 ZStack(alignment: .bottomTrailing) {
                     Color(nsColor: .textBackgroundColor)
                     detail
-                    if !searching && !schedulerPresented && section != .history && section != .trash {
+                        .accessibilityHidden(editorPresented)
+                        .disabled(editorPresented)
+                    if !searching && !schedulerPresented && !editorPresented && section != .history && section != .trash {
                         Button(action: createInSection) {
                             Image(systemName: "plus")
                                 .font(.system(size: 23, weight: .semibold))
@@ -72,6 +78,23 @@ struct ContentView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay {
+                    if let item = editing {
+                        PlannerEditorOverlay {
+                            TaskEditorView(item: item, store: store, onClose: closeEditor, onNewEvent: { draft in
+                                openEvent(nil, day: draft.day ?? scheduleDay, draft: draft)
+                            }).id(item.id)
+                        }
+                    } else if editingEvent {
+                        PlannerEditorOverlay {
+                            CalendarEventEditor(store: calendars, day: eventDay, event: eventToEdit,
+                                                taskDraft: eventDraft, onClose: closeEditor, onSwitchToTask: { draft in
+                                closeEditor()
+                                editing = draft
+                            })
+                        }
+                    }
+                }
             }
         }
         .tint(section.tint)
@@ -94,10 +117,6 @@ struct ContentView: View {
         }
         .onChange(of: search) { searchEvents = calendars.search(search) }
         .onReceive(calendars.$calendars.receive(on: RunLoop.main)) { _ in searchEvents = calendars.search(search) }
-        .sheet(item: $eventToEdit) { event in
-            CalendarEventEditor(store: calendars, day: event.start, event: event)
-        }
-        .sheet(item: $editing) { TaskEditorView(item: $0, store: store) }
         .sheet(isPresented: $quickCapture) { QuickCaptureView(store: store) }
         .alert("Could not update planner", isPresented: Binding(
             get: { store.errorMessage != nil },
@@ -130,7 +149,8 @@ struct ContentView: View {
                 item.day = day
                 editing = item
             }, day: $scheduleDay, schedulerPresented: $schedulerPresented,
-               onDayChange: { materialize(through: $0) }, onSearch: startSearch)
+               onDayChange: { materialize(through: $0) }, onSearch: startSearch,
+               onEvent: { event, day in openEvent(event, day: day) })
         } else if (section == .lists || section == .tags) && !isSearching {
             OrganizationView(store: store, section: section == .lists ? .lists : .tags,
                              onEdit: { editing = $0 }, onSearch: startSearch,
@@ -198,9 +218,9 @@ struct ContentView: View {
                     ForEach(searchEvents) { event in
                         Label(event.title, systemImage: "calendar")
                             .contentShape(Rectangle())
-                            .onTapGesture(count: 2) { eventToEdit = event }
+                            .onTapGesture(count: 2) { openEvent(event, day: event.start) }
                             .accessibilityElement(children: .contain)
-                            .accessibilityAction { eventToEdit = event }
+                            .accessibilityAction { openEvent(event, day: event.start) }
                     }
                 }
             }
@@ -214,7 +234,23 @@ struct ContentView: View {
             .padding(.horizontal, 32)
     }
 
+    private func closeEditor() {
+        editing = nil
+        editingEvent = false
+        eventToEdit = nil
+        eventDraft = nil
+    }
+
+    private func openEvent(_ event: PlannerCalendarEvent?, day: Date, draft: PlannerItem? = nil) {
+        editing = nil
+        eventDay = day
+        eventToEdit = event
+        eventDraft = draft
+        editingEvent = true
+    }
+
     private func startSearch() {
+        guard !editorPresented else { return }
         schedulerPresented = false
         searching = true
     }
@@ -225,6 +261,7 @@ struct ContentView: View {
     }
 
     private func createInSection() {
+        guard !editorPresented else { return }
         if !searching && (section == .lists || section == .tags) {
             collectionRequest += 1
         } else {
@@ -236,7 +273,7 @@ struct ContentView: View {
 
     private func openLink(_ url: URL) {
         guard let link = PlannerLink(url: url) else { return }
-        editing = nil
+        closeEditor()
         quickCapture = false
         eventToEdit = nil
         finishSearch()

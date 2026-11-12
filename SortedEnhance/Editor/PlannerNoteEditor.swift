@@ -5,34 +5,45 @@ struct PlannerNoteEditor: View {
     @Binding var notes: String
     @Binding var richNotes: Data?
     var extractedTitles: Binding<[String]>?
+    var compact = false
 
     @StateObject private var session = NoteSession()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack {
-                Text("Notes").font(.headline)
-                Spacer()
-                Button {
-                    session.toggleBold()
-                } label: {
-                    Image(systemName: "bold")
-                }
-                .accessibilityLabel("Bold").help("Bold")
-                Button {
-                    session.toggleChecklist()
-                } label: {
-                    Image(systemName: "checklist")
-                }
-                .accessibilityLabel("Toggle checklist item").help("Toggle checklist item")
-                if let extractedTitles {
-                    Button("Extract lines") { session.extractLines(into: extractedTitles) }
-                        .help("Turn selected note lines into tasks when you save")
+            if !compact {
+                HStack {
+                    Text("Notes").font(.headline)
+                    Spacer()
+                    Button {
+                        session.toggleBold()
+                    } label: {
+                        Image(systemName: "bold")
+                    }
+                    .accessibilityLabel("Bold").help("Bold")
+                    Button {
+                        session.toggleChecklist()
+                    } label: {
+                        Image(systemName: "checklist")
+                    }
+                    .accessibilityLabel("Toggle checklist item").help("Toggle checklist item")
+                    if let extractedTitles {
+                        Button("Extract lines") { session.extractLines(into: extractedTitles) }
+                            .help("Turn selected note lines into tasks when you save")
+                    }
                 }
             }
-            NoteTextView(notes: $notes, richNotes: $richNotes, session: session)
-                .frame(minHeight: 96, idealHeight: 130)
-                .border(.secondary.opacity(0.25))
+            ZStack(alignment: .topLeading) {
+                NoteTextView(notes: $notes, richNotes: $richNotes, session: session)
+                if compact && notes.isEmpty {
+                    Text("Notes")
+                        .foregroundStyle(.tertiary)
+                        .padding(.leading, 5).padding(.top, 4)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(height: compact ? 25 : 96)
         }
     }
 }
@@ -115,6 +126,8 @@ private struct NoteTextView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSTextView.scrollableTextView()
         let textView = scroll.documentView as! NSTextView
+        scroll.drawsBackground = false
+        textView.drawsBackground = false
         textView.isRichText = true
         textView.importsGraphics = false
         textView.allowsUndo = true

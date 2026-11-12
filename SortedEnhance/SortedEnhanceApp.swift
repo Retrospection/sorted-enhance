@@ -27,12 +27,8 @@ struct SortedEnhanceApp: App {
             }
         }
         Settings {
-            TabView {
-                GeneralPreferencesView().tabItem { Label("General", systemImage: "gearshape") }
-                RecoveryView(recovery: recovery).tabItem { Label("Data", systemImage: "externaldrive") }
-            }
-            .modifier(PlannerPreferencesModifier())
-            .frame(minWidth: 470, minHeight: 360)
+            PlannerSettingsView(recovery: recovery)
+                .modifier(PlannerPreferencesModifier())
         }
     }
 }

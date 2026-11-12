@@ -38,8 +38,8 @@ struct TaskEditorView: View {
                 .accessibilityIdentifier(draft.status == .active ? "Complete" : "Reopen")
                 .foregroundStyle(.secondary)
                 .disabled(draft.deleted)
-                TextField("Title", text: $draft.title)
-                    .textFieldStyle(.plain).font(.system(size: 16, weight: .medium))
+                TextField("Title", text: $draft.title, prompt: Text(openingItem == nil ? "New Task" : "Title"))
+                    .textFieldStyle(.plain).font(.system(size: 16, weight: .semibold))
                     .accessibilityIdentifier("Title")
                     .focused($titleFocused)
                     .onSubmit { save(draft) }

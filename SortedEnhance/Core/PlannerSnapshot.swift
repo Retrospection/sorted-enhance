@@ -23,6 +23,11 @@ struct PlannerItem: Codable, Hashable, Identifiable, Sendable {
     var locked = false
     var status = PlannerStatus.active
     var deleted = false
+    var closedAt: Date?
+    var deletedAt: Date?
+    var purged: Bool?
+
+    var inTrash: Bool { deleted && purged != true }
     var listID: UUID?
     var tags: [String] = []
     var order = Int.max

@@ -182,7 +182,9 @@ struct ContentView: View {
                     .buttonStyle(.plain)
                     .padding(.horizontal, 44).padding(.top, 38).padding(.bottom, 20)
                 }
-                if visibleItems.isEmpty && !isSearching {
+                if !isSearching && (section == .history || section == .trash) {
+                    PlannerArchiveView(section: section, store: store, onEdit: { editing = $0 })
+                } else if visibleItems.isEmpty && !isSearching {
                     PlannerEmptyState(section: section)
                         .padding(.bottom, 180)
                 } else {
@@ -294,7 +296,7 @@ struct ContentView: View {
             search = query
         case .item(let id):
             if !store.items.contains(where: { $0.id == id }) { materialize(through: .now) }
-            guard let item = store.items.first(where: { $0.id == id }) else { return }
+            guard let item = store.items.first(where: { $0.id == id && $0.purged != true }) else { return }
             eventToEdit = nil
             quickCapture = false
             editing = item

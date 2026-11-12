@@ -126,3 +126,22 @@ let migrated = applying(PlannerRepetition.edit(onlyToday, original: legacy[0], i
 let migratedFuture = PlannerRepetition.upcoming(in: migrated, through: date(6, 6))
 precondition(migratedFuture.contains { $0.title == "Planning" && $0.start == date(6, 6) })
 precondition((migrated + migratedFuture).compactMap(\.revisionDefaults).count == 1)
+
+let archiveDir = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+defer { try? FileManager.default.removeItem(at: archiveDir) }
+let archiveStore = PlannerStore(fileURL: archiveDir.appending(path: "planner.json"))
+precondition(archiveStore.save(daily))
+var ownerToDelete = daily[0]
+ownerToDelete.deleted = true
+var ordinaryOccurrence = daily[2]
+ordinaryOccurrence.deleted = true
+ordinaryOccurrence.notes = "Private exception"
+precondition(archiveStore.save([ownerToDelete, ordinaryOccurrence]))
+let beforeEmpty = archiveStore.snapshot
+precondition(archiveStore.emptyTrash() && !archiveStore.items.contains(where: \.inTrash))
+let marker = archiveStore.items.first { $0.id == ordinaryOccurrence.id }!
+precondition(marker.purged == true && marker.notes.isEmpty && marker.attachments == nil)
+let afterEmpty = PlannerRepetition.upcoming(in: archiveStore.items, through: date(6, 8))
+precondition(!afterEmpty.isEmpty && !afterEmpty.contains { $0.id == ordinaryOccurrence.id || $0.id == ownerToDelete.id })
+precondition(afterEmpty.allSatisfy { $0.title == daily[0].title && !$0.deleted && $0.purged == nil })
+precondition(archiveStore.undo() && archiveStore.snapshot == beforeEmpty)

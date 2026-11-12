@@ -16,6 +16,8 @@ enum PlannerItemEdit {
     static let linkedFields = [
         ["day", "start", "locked", "reminderOffsetMinutes", "scheduledDuration"],
         ["notes", "richNotes"],
+        ["status", "closedAt"],
+        ["deleted", "deletedAt", "purged"],
     ]
 
     static func changedKeys<Value: Equatable>(from old: [String: Value], to new: [String: Value]) -> Set<String> {
@@ -27,7 +29,7 @@ enum PlannerItemEdit {
     }
 
     static func reconcile(_ draft: PlannerItem, opening: PlannerItem, current: PlannerItem?) throws -> PlannerItem {
-        guard let current, current.deleted == opening.deleted, current.id == draft.id else {
+        guard let current, current.purged != true, current.deleted == opening.deleted, current.id == draft.id else {
             throw PlannerEditError.deleted
         }
         if current == opening { return draft }

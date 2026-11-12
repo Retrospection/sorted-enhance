@@ -62,7 +62,23 @@ final class PlannerStore: ObservableObject {
         var next = snapshot
         var positions = Dictionary(uniqueKeysWithValues: next.items.indices.map { (next.items[$0].id, $0) })
         var largestOrder = next.items.lazy.map(\.order).filter { $0 < Int.max }.max() ?? -1
+        let now = Date.now
         for var item in changed {
+            let previous = positions[item.id].map { next.items[$0] }
+            if item.status == .active {
+                item.closedAt = nil
+            } else if previous?.status != item.status {
+                item.closedAt = now
+            } else {
+                item.closedAt = previous?.closedAt
+            }
+            if !item.deleted {
+                item.deletedAt = nil
+            } else if previous?.deleted != true {
+                item.deletedAt = now
+            } else {
+                item.deletedAt = previous?.deletedAt
+            }
             if item.order == Int.max {
                 if let position = positions[item.id] {
                     item.order = next.items[position].order
@@ -80,6 +96,27 @@ final class PlannerStore: ObservableObject {
             if item.order < Int.max {
                 largestOrder = max(largestOrder, item.order)
             }
+        }
+        return commit(next)
+    }
+
+    @discardableResult
+    func emptyTrash() -> Bool {
+        var next = snapshot
+        next.items = next.items.compactMap { item in
+            guard item.inTrash else { return item }
+            guard item.seriesID != nil else { return nil }
+            // Keep the occupied index and revision boundary so this occurrence stays deleted.
+            var marker = PlannerItem(title: "")
+            marker.id = item.id
+            marker.order = item.order
+            marker.deleted = true
+            marker.purged = true
+            marker.seriesID = item.seriesID
+            marker.occurrenceIndex = item.occurrenceIndex
+            marker.recurrence = item.recurrence
+            marker.revisionDefaults = item.revisionDefaults
+            return marker
         }
         return commit(next)
     }

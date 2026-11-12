@@ -148,7 +148,7 @@ struct SettingsRow<Content: View>: View {
 struct GeneralPreferencesView: View {
     @AppStorage(PreferenceKey.theme) private var theme = Theme.system
     @AppStorage(PreferenceKey.rowSize) private var rowSize = RowSize.system
-    @AppStorage(PreferenceKey.firstWeekday) private var firstWeekday = 0
+    @AppStorage(PreferenceKey.firstWeekday) private var firstWeekday = 2
     @AppStorage(PreferenceKey.clock) private var clock = Clock.system
     @Environment(\.calendar) private var calendar
 
@@ -199,7 +199,7 @@ struct GeneralPreferencesView: View {
 struct PlannerPreferencesModifier: ViewModifier {
     @AppStorage(PreferenceKey.theme) private var theme = Theme.system
     @AppStorage(PreferenceKey.rowSize) private var rowSize = RowSize.system
-    @AppStorage(PreferenceKey.firstWeekday) private var firstWeekday = 0
+    @AppStorage(PreferenceKey.firstWeekday) private var firstWeekday = 2
     @AppStorage(PreferenceKey.clock) private var clock = Clock.system
     @Environment(\.locale) private var locale
     @Environment(\.calendar) private var calendar

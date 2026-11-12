@@ -10,6 +10,7 @@ struct DailyScheduleView: View {
 
     @AppStorage("scheduleDefaultDuration") private var defaultDuration = DayPlanner.standardDuration
     @StateObject private var calendars = SystemCalendarStore()
+    @Environment(\.locale) private var locale
     @Binding private var day: Date
     @State private var dayInput: String
     @State private var selection: Set<String> = []
@@ -168,6 +169,8 @@ struct DailyScheduleView: View {
         }
     }
 
+    private let navigationInk = Color(red: 0.39, green: 0.45, blue: 0.51)
+
     private var navigation: some View {
         HStack(spacing: 14) {
             Button {
@@ -177,9 +180,10 @@ struct DailyScheduleView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "calendar")
                         .font(.system(size: 23, weight: .medium))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(PlannerSection.schedule.tint)
                     Text(dayHeading)
                         .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(.primary)
                     Text(dateCaption)
                         .font(.system(size: 19))
                         .foregroundStyle(.secondary)
@@ -192,10 +196,17 @@ struct DailyScheduleView: View {
             .accessibilityIdentifier("scheduleDatePicker")
             .popover(isPresented: $showDate) { datePicker }
             Spacer(minLength: 8)
-            Button(action: onSearch) { Image(systemName: "magnifyingglass") }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Search")
-                .help("Search")
+            Button(action: onSearch) {
+                Image(systemName: "magnifyingglass")
+                    .resizable().scaledToFit()
+                    .frame(width: 20, height: 20)
+                    .foregroundStyle(navigationInk)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Search")
+            .help("Search")
             Menu {
                 Button("New Event") { onEvent(nil, day) }
                 Button("Auto Schedule") {
@@ -213,12 +224,19 @@ struct DailyScheduleView: View {
                 Button("Today") { day = Calendar.current.startOfDay(for: Date()) }
                 Button("Next day") { navigate(1) }.keyboardShortcut(.rightArrow, modifiers: .command)
             } label: {
-                Image(systemName: "ellipsis")
-                    .frame(width: 28, height: 28)
+                Color.clear.frame(width: 28, height: 28)
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
-            .fixedSize()
+            .frame(width: 28, height: 28)
+            .overlay {
+                Image(systemName: "ellipsis")
+                    .resizable().scaledToFit()
+                    .frame(width: 20, height: 8)
+                    .foregroundStyle(navigationInk)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
             .accessibilityLabel("Schedule options")
             .accessibilityIdentifier("scheduleOptions")
             .popover(isPresented: $showCalendars) { CalendarSourcesView(store: calendars) }
@@ -237,10 +255,15 @@ struct DailyScheduleView: View {
 
     private var dateCaption: String {
         let calendar = Calendar.current
+        let monthDay = day.formatted(.dateTime.month(.abbreviated).day().locale(locale))
         if calendar.isDateInToday(day) || calendar.isDateInTomorrow(day) || calendar.isDateInYesterday(day) {
-            return day.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+            if locale.language.languageCode?.identifier == "zh" {
+                let weekday = day.formatted(.dateTime.weekday(.abbreviated).locale(locale))
+                return weekday + " " + monthDay
+            }
+            return day.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().locale(locale))
         }
-        return day.formatted(.dateTime.month(.abbreviated).day())
+        return monthDay
     }
 
     private var datePicker: some View {

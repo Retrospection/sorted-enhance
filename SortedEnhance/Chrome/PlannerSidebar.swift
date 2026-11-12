@@ -43,11 +43,12 @@ struct PlannerSidebar: View {
 
     @Environment(\.calendar) private var calendar
     @Environment(\.locale) private var locale
+    @Environment(\.layoutDirection) private var layoutDirection
     @State private var browsingMonth: Date?
     @FocusState private var focusedDate: Date?
 
     private let background = Color(red: 39 / 255, green: 52 / 255, blue: 68 / 255)
-    private let secondary = Color(red: 0.66, green: 0.72, blue: 0.78)
+    private let secondary = Color(red: 159 / 255, green: 179 / 255, blue: 200 / 255)
     private let selection = Color(red: 0.39, green: 0.75, blue: 1)
 
     private var month: Date { browsingMonth ?? day }
@@ -55,7 +56,7 @@ struct PlannerSidebar: View {
     private var weekdaySymbols: [String] {
         var localized = calendar
         localized.locale = locale
-        return localized.veryShortStandaloneWeekdaySymbols
+        return localized.shortStandaloneWeekdaySymbols
     }
 
     var body: some View {
@@ -83,9 +84,13 @@ struct PlannerSidebar: View {
     private var monthCalendar: some View {
         VStack(spacing: 0) {
             HStack(spacing: 4) {
-                Text(month, format: .dateTime.year().locale(locale))
-                    .foregroundStyle(section.tint)
-                Text(month, format: .dateTime.month(.wide).locale(locale))
+                HStack(alignment: .firstTextBaseline, spacing: locale.language.languageCode?.identifier == "zh" ? 0 : 4) {
+                    Text(month, format: .dateTime.year().locale(locale))
+                        .fontWeight(.regular)
+                        .foregroundStyle(section.tint)
+                    Text(month, format: .dateTime.month(.wide).locale(locale))
+                        .fontWeight(.semibold)
+                }
                 Spacer(minLength: 0)
                 monthButton(by: -1)
                 monthButton(by: 1)
@@ -128,7 +133,7 @@ struct PlannerSidebar: View {
             guard let start = calendar.dateInterval(of: .month, for: month)?.start else { return }
             browsingMonth = calendar.date(byAdding: .month, value: offset, to: start)
         } label: {
-            Image(systemName: offset < 0 ? "chevron.left" : "chevron.right")
+            Image(systemName: offset < 0 ? "chevron.backward" : "chevron.forward")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(secondary)
                 .frame(width: 25, height: 28)
@@ -146,12 +151,17 @@ struct PlannerSidebar: View {
         return Button {
             select(date)
         } label: {
-            VStack(spacing: 0) {
-                Text(verbatim: String(calendar.component(.day, from: date)))
-                    .font(.system(size: 15, weight: selected ? .semibold : .regular))
+            HStack(spacing: 1) {
+                Text(calendar.component(.day, from: date), format: .number.locale(locale))
+                    .font(.system(size: 14, weight: .bold))
                 if locale.language.languageCode?.identifier == "zh" {
-                    Text(verbatim: SidebarMonth.lunarDay(date, timeZone: calendar.timeZone))
-                        .font(.system(size: 9))
+                    let lunarDay = SidebarMonth.lunarDay(date, timeZone: calendar.timeZone)
+                    VStack(spacing: 0) {
+                        ForEach(Array(lunarDay.enumerated()), id: \.offset) { _, character in
+                            Text(verbatim: String(character))
+                        }
+                    }
+                    .font(.system(size: 6.5))
                 }
             }
             .foregroundStyle(selected ? selection : (outside || past ? secondary : .white))
@@ -172,8 +182,8 @@ struct PlannerSidebar: View {
         .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { key in
             let offset: Int
             switch key.key {
-            case .leftArrow: offset = -1
-            case .rightArrow: offset = 1
+            case .leftArrow: offset = layoutDirection == .rightToLeft ? 1 : -1
+            case .rightArrow: offset = layoutDirection == .rightToLeft ? -1 : 1
             case .upArrow: offset = -7
             case .downArrow: offset = 7
             default: return .ignored
@@ -209,6 +219,7 @@ struct PlannerSidebar: View {
                 } label: {
                     HStack(spacing: 13) {
                         Image(systemName: destination.systemImage)
+                            .symbolVariant(.none)
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(section == destination ? .white : secondary)
                             .frame(width: 35, height: 35)
@@ -218,6 +229,7 @@ struct PlannerSidebar: View {
                                 }
                             }
                         Text(destination.label)
+                            .foregroundStyle(section == destination ? .white : secondary)
                             .lineLimit(1)
                             .font(.system(size: 16, weight: .medium))
                         Spacer(minLength: 0)
@@ -226,7 +238,8 @@ struct PlannerSidebar: View {
                     .frame(height: 43)
                     .background {
                         if section == destination {
-                            RoundedRectangle(cornerRadius: 8).fill(.white.opacity(0.12))
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color(red: 51 / 255, green: 70 / 255, blue: 95 / 255))
                         }
                     }
                     .contentShape(Rectangle())
@@ -244,7 +257,7 @@ struct PlannerSidebar: View {
     private var footer: some View {
         HStack {
             Button(action: onSettings) {
-                Image(systemName: "gearshape.fill").frame(width: 32, height: 32)
+                Image(systemName: "gearshape").frame(width: 32, height: 32)
             }
             .accessibilityLabel("Settings")
             .help("Settings")

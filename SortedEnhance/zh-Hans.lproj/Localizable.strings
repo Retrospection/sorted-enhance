@@ -241,3 +241,10 @@
 "Yesterday" = "昨天";
 "iCloud Drive" = "iCloud 云盘";
 "min" = "分钟";
+"Last 7 days" = "最近7天";
+"Empty Trash" = "清空回收站";
+"Earlier" = "更早";
+"Date unknown" = "日期未知";
+"Empty Trash?" = "清空回收站？";
+"No history at the moment." = "暂无历史记录";
+"Remove all tasks from Trash? You can undo this change." = "清空回收站内的所有任务？可撤销此操作。";

@@ -206,6 +206,7 @@ struct DailyScheduleView: View {
                         .foregroundStyle(.secondary)
                 }
                 .lineLimit(1)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Schedule date")

@@ -9,6 +9,7 @@ struct PlannerRecurrence: Codable, Hashable, Sendable {
     var interval = 1
     var anchor: Date
     var anchorIndex = 0
+    var revisionIndex: Int?
     var timeZoneID: String
 
     init(frequency: Frequency, anchor: Date, timeZone: TimeZone = .current) {

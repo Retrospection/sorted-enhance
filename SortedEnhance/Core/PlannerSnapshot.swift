@@ -61,5 +61,16 @@ struct PlannerSnapshot: Codable, Hashable, Sendable {
                 NSLocalizedDescriptionKey: "The planner contains duplicate IDs or missing folders or lists."
             ])
         }
+        var occurrences: [UUID: Set<Int>] = [:]
+        for item in items {
+            if let series = item.seriesID, let index = item.occurrenceIndex,
+               index >= 0, occurrences[series, default: []].insert(index).inserted {
+                if let rule = item.recurrence, rule.interval <= 0 || rule.anchorIndex < 0 {
+                    throw CocoaError(.fileReadCorruptFile)
+                }
+            } else if item.seriesID != nil || item.occurrenceIndex != nil || item.recurrence != nil {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+        }
     }
 }

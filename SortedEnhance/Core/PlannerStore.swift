@@ -13,6 +13,7 @@ final class PlannerStore: ObservableObject {
     var lists: [PlannerList] { snapshot.lists }
     var canUndo: Bool { !past.isEmpty }
     var canRedo: Bool { !future.isEmpty }
+    var libraryIsReadable: Bool { !readFailed }
 
     private let fileURL: URL
     private var past: [PlannerSnapshot] = []

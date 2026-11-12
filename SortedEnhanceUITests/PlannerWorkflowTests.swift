@@ -196,7 +196,7 @@ final class PlannerWorkflowTests: XCTestCase {
 
     private func field(_ label: String, type: XCUIElement.ElementType = .textField) -> XCUIElement {
         let element = app.descendants(matching: type)[label]
-        XCTAssertTrue(element.waitForExistence(timeout: 3), "Missing field: \(label)")
+        XCTAssertTrue(element.waitForExistence(timeout: 3), "Missing field: \(label)\n\(app.debugDescription)")
         return element
     }
 

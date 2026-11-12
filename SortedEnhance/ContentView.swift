@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var editingEvent = false
     @State private var eventDay = Date.now
     @State private var eventDraft: PlannerItem?
+    @State private var eventFields: EventCreationDraft?
     @State private var searchEvents: [PlannerCalendarEvent] = []
     @State private var selectedTask: UUID?
     @Environment(\.scenePhase) private var phase
@@ -89,8 +90,9 @@ struct ContentView: View {
                     } else if editingEvent {
                         PlannerEditorOverlay {
                             CalendarEventEditor(store: calendars, day: eventDay, event: eventToEdit,
-                                                taskDraft: eventDraft, onClose: closeEditor, onSwitchToTask: { draft in
+                                                taskDraft: eventDraft, eventFields: eventFields, onClose: closeEditor, onSwitchToTask: { draft, fields in
                                 closeEditor()
+                                eventFields = fields
                                 editing = draft
                             })
                         }
@@ -242,6 +244,7 @@ struct ContentView: View {
         editingEvent = false
         eventToEdit = nil
         eventDraft = nil
+        eventFields = nil
     }
 
     private func openEvent(_ event: PlannerCalendarEvent?, day: Date, draft: PlannerItem? = nil) {

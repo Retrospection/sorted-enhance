@@ -1,4 +1,5 @@
 import CryptoKit
+import EventKit
 import Foundation
 
 let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -38,3 +39,31 @@ precondition(resynced == note)
 let otherCalendar = try files.load(occurrence("local-C", timeZone: "Europe/Helsinki", calendarID: "copy"),
                                    uniqueProviderMatch: true)
 precondition(otherCalendar == EventAnnotation())
+
+let task = PlannerItem(title: "Trip")
+let first = Date(timeIntervalSince1970: 1_800_000_000)
+let last = first.addingTimeInterval(3 * 86_400)
+let options = EventCreationDraft(taskID: task.id, calendarID: "travel", repeatFrequency: .weekly,
+                                 allDay: true, lastDay: last, calendarNotes: "Provider note")
+var editedTask = task
+editedTask.title = "New trip"
+let resumed = EventCreationDraft.fields(for: editedTask, previous: options, defaultCalendarID: "default", start: first)
+precondition(resumed.calendarID == "travel" && resumed.repeatFrequency == .weekly && resumed.allDay)
+precondition(resumed.lastDay == last && resumed.calendarNotes == "Provider note")
+let unrelated = EventCreationDraft.fields(for: PlannerItem(title: "Next"), previous: options,
+                                         defaultCalendarID: "default", start: first)
+precondition(unrelated.calendarID == "default" && unrelated.repeatFrequency == nil && !unrelated.allDay)
+precondition(unrelated.lastDay == first && unrelated.calendarNotes.isEmpty)
+
+let event = EKEvent(eventStore: EKEventStore())
+event.addAlarm(EKAlarm(relativeOffset: -300))
+event.addAlarm(EKAlarm(relativeOffset: -900))
+event.addAlarm(EKAlarm(absoluteDate: first))
+let audio = EKAlarm(relativeOffset: -1_200)
+audio.soundName = "Basso"
+event.addAlarm(audio)
+precondition(EventAlerts.editable(in: event).count == 2)
+EventAlerts.replace(in: event, minutesBefore: nil)
+precondition(EventAlerts.editable(in: event).isEmpty)
+precondition(event.alarms?.count == 2 && event.alarms?.contains(where: { $0.absoluteDate == first }) == true)
+precondition(event.alarms?.contains(where: { $0.soundName == "Basso" }) == true)

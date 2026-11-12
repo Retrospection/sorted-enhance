@@ -6,7 +6,7 @@ struct CalendarEventEditor: View {
     private let initialStart: Date
     let taskDraft: PlannerItem?
     let onClose: (() -> Void)?
-    let onSwitchToTask: ((PlannerItem) -> Void)?
+    let onSwitchToTask: ((PlannerItem, EventCreationDraft) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @FocusState private var titleFocused: Bool
     @State private var alertMinutes: Int?
@@ -28,8 +28,8 @@ struct CalendarEventEditor: View {
     @State private var error: String?
 
     init(store: SystemCalendarStore, day: Date, event: PlannerCalendarEvent? = nil,
-         taskDraft: PlannerItem? = nil, onClose: (() -> Void)? = nil,
-         onSwitchToTask: ((PlannerItem) -> Void)? = nil) {
+         taskDraft: PlannerItem? = nil, eventFields: EventCreationDraft? = nil, onClose: (() -> Void)? = nil,
+         onSwitchToTask: ((PlannerItem, EventCreationDraft) -> Void)? = nil) {
         self.store = store
         self.taskDraft = taskDraft
         self.onClose = onClose
@@ -46,10 +46,13 @@ struct CalendarEventEditor: View {
         _clock = State(initialValue: String(format: "%02d:%02d", calendar.component(.hour, from: start),
                                            calendar.component(.minute, from: start)))
         _duration = State(initialValue: event.map { max(1, Int($0.end.timeIntervalSince($0.start) / 60)) } ?? taskDraft?.duration ?? 30)
-        _calendarID = State(initialValue: event?.calendarID ?? store.defaultCalendarID ?? "")
-        _allDay = State(initialValue: event?.isAllDay ?? false)
-        _lastDay = State(initialValue: event.flatMap { $0.isAllDay ? $0.end.addingTimeInterval(-1) : nil } ?? start)
-        _notes = State(initialValue: event?.notes ?? "")
+        let fields = EventCreationDraft.fields(for: taskDraft, previous: eventFields,
+                                              defaultCalendarID: store.defaultCalendarID ?? "", start: start)
+        _calendarID = State(initialValue: event?.calendarID ?? fields.calendarID)
+        _repeatFrequency = State(initialValue: fields.repeatFrequency)
+        _allDay = State(initialValue: event?.isAllDay ?? fields.allDay)
+        _lastDay = State(initialValue: event.flatMap { $0.isAllDay ? $0.end.addingTimeInterval(-1) : nil } ?? fields.lastDay)
+        _notes = State(initialValue: event?.notes ?? fields.calendarNotes)
         if let taskDraft {
             _annotation = State(initialValue: EventAnnotation(notes: taskDraft.notes, richNotes: taskDraft.richNotes,
                                                               attachments: taskDraft.attachments ?? []))
@@ -198,10 +201,11 @@ struct CalendarEventEditor: View {
             }
             if taskDraft == nil || duration != (taskDraft?.duration ?? 30) { item.duration = duration }
             item.reminderOffsetMinutes = alertMinutes
-            item.notes = [annotation.notes, notes].filter { !$0.isEmpty }.joined(separator: "\n")
-            item.richNotes = notes.isEmpty ? annotation.richNotes : nil
+            item.notes = annotation.notes
+            item.richNotes = annotation.richNotes
             item.attachments = annotation.attachments.isEmpty ? nil : annotation.attachments
-            onSwitchToTask(item)
+            onSwitchToTask(item, EventCreationDraft(taskID: item.id, calendarID: calendarID,
+                        repeatFrequency: repeatFrequency, allDay: allDay, lastDay: lastDay, calendarNotes: notes))
         } catch { self.error = error.localizedDescription }
     }
 

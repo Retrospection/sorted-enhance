@@ -41,6 +41,7 @@ struct ContentView: View {
         GeometryReader { geometry in
             HStack(spacing: 0) {
                 PlannerSidebar(section: Binding(get: { section }, set: { destination in
+                    finishSearch()
                     listToShow = nil
                     listNavigation = UUID()
                     section = destination

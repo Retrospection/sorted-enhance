@@ -11,7 +11,7 @@ final class WindowCaptureTests: XCTestCase {
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN", "-AppleInterfaceStyle", "Light"]
         app.launch()
 
-        let planner = app.windows.containing(.button, identifier: "Inbox").firstMatch
+        let planner = app.windows.firstMatch
         XCTAssertTrue(planner.waitForExistence(timeout: 5))
         XCTAssertTrue(planner.buttons["newScheduleTask"].waitForExistence(timeout: 5))
         attach(planner, named: "Schedule")
@@ -23,13 +23,13 @@ final class WindowCaptureTests: XCTestCase {
         attach(planner, named: "Inbox")
 
         newTask.click()
-        let title = planner.textFields["Title"]
-        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        let title = app.textFields["Title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5), app.debugDescription)
         title.click()
         title.typeText("Review proposal")
         XCTAssertEqual(title.value as? String, "Review proposal")
         attach(planner, named: "TaskEditor")
-        planner.buttons["Close"].click()
+        app.buttons["Close"].click()
 
         app.typeKey(",", modifierFlags: .command)
         let settings = app.windows.containing(.button, identifier: "完成").firstMatch

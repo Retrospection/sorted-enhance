@@ -13,8 +13,10 @@ struct SortedEnhanceApp: App {
                 .modifier(PlannerPreferencesModifier())
                 .onAppear { recovery.refresh() }
         }
-        .defaultSize(width: 960, height: 640)
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1024, height: 800)
         .commands {
+            PlannerCommands()
             CommandMenu("Planner") {
                 Button("Undo Planner Change") { store.undo() }
                     .keyboardShortcut("z", modifiers: [.command, .option])

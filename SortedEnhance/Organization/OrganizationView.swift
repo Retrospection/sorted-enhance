@@ -1,15 +1,45 @@
 import SwiftUI
 
+enum OrganizationSection: String {
+    case lists = "Lists"
+    case tags = "Tags"
+
+    var title: String {
+        switch self {
+        case .lists: String(localized: "Lists")
+        case .tags: String(localized: "Tags")
+        }
+    }
+}
+
+private struct CollectionCount {
+    var total = 0
+    var unscheduled = 0
+
+    mutating func add(_ item: PlannerItem) {
+        total += 1
+        if item.day == nil && item.start == nil { unscheduled += 1 }
+    }
+
+    var summary: String {
+        if total == 1 {
+            String(localized: "\(total) task · \(unscheduled) unscheduled")
+        } else {
+            String(localized: "\(total) tasks · \(unscheduled) unscheduled")
+        }
+    }
+}
+
 private enum CollectionFilter: Hashable {
-    case all, folder(UUID), list(UUID), tag(String)
+    case folder(UUID), list(UUID), tag(String)
 }
 
 private enum CollectionEdit {
-    case newFolder, newList(UUID?), folder(PlannerFolder), list(PlannerList)
+    case newTag, newFolder, newList(UUID?), folder(PlannerFolder), list(PlannerList)
 
     var initialName: String {
         switch self {
-        case .newFolder, .newList: ""
+        case .newFolder, .newList, .newTag: ""
         case .folder(let folder): folder.name
         case .list(let list): list.name
         }
@@ -17,6 +47,7 @@ private enum CollectionEdit {
 
     var title: String {
         switch self {
+        case .newTag: "New Tag"
         case .newFolder: "New Folder"
         case .newList: "New List"
         case .folder: "Rename Folder"
@@ -28,16 +59,25 @@ private enum CollectionEdit {
 struct OrganizationView: View {
     @ObservedObject var store: PlannerStore
     let onEdit: (PlannerItem) -> Void
-    @State private var filter: CollectionFilter? = .all
+    let section: OrganizationSection
+    let onSearch: () -> Void
+    let newCollectionSignal: Int
+    let initialListID: UUID?
+    @State private var filter: CollectionFilter?
     @State private var selected = Set<UUID>()
     @State private var editing: CollectionEdit?
     @State private var name = ""
     @State private var mergeError: String?
 
-    init(store: PlannerStore, onEdit: @escaping (PlannerItem) -> Void, initialListID: UUID? = nil) {
+    init(store: PlannerStore, section: OrganizationSection, onEdit: @escaping (PlannerItem) -> Void,
+         onSearch: @escaping () -> Void, newCollectionSignal: Int, initialListID: UUID? = nil) {
+        self.section = section
+        self.onSearch = onSearch
+        self.newCollectionSignal = newCollectionSignal
+        self.initialListID = initialListID
         self.store = store
         self.onEdit = onEdit
-        _filter = State(initialValue: initialListID.map(CollectionFilter.list) ?? .all)
+        _filter = State(initialValue: initialListID.map(CollectionFilter.list))
     }
 
     private var active: [PlannerItem] {
@@ -48,10 +88,10 @@ struct OrganizationView: View {
         let lists = store.lists
         return active.filter { item in
             switch filter {
-            case .all, nil: true
+            case nil: false
             case .folder(let id): lists.contains { $0.id == item.listID && $0.folderID == id }
             case .list(let id): item.listID == id
-            case .tag(let tag): item.tags.contains(tag)
+            case .tag(let tag): item.tags.contains { PlannerTag.key($0) == PlannerTag.key(tag) }
             }
         }.sorted { ($0.order, $0.id.uuidString) < ($1.order, $1.id.uuidString) }
     }
@@ -67,76 +107,41 @@ struct OrganizationView: View {
     }
 
     var body: some View {
-        HSplitView {
-            VStack(alignment: .leading, spacing: 0) {
-                List(selection: $filter) {
-                    Label("All Tasks", systemImage: "tray.full").tag(CollectionFilter.all)
-                    Section("Lists") {
-                        ForEach(lists(in: nil)) { listRow($0) }
-                    }
-                    ForEach(folders) { folder in
-                        Section {
-                            Label(folder.name, systemImage: "folder")
-                                .tag(CollectionFilter.folder(folder.id))
-                                .contextMenu {
-                                    Button("New List…") { begin(.newList(folder.id)) }
-                                    Button("Rename Folder…") { begin(.folder(folder)) }
-                                    Button("Move Up") { reorder(folder, by: -1) }
-                                        .disabled(folders.first?.id == folder.id)
-                                    Button("Move Down") { reorder(folder, by: 1) }
-                                        .disabled(folders.last?.id == folder.id)
-                                }
-                            ForEach(lists(in: folder.id)) { list in
-                                listRow(list).padding(.leading, 12)
-                            }
-                        }
-                    }
-                    Section("Tags") {
-                        ForEach(Set(active.flatMap(\.tags)).sorted(), id: \.self) { tag in
-                            Label(tag, systemImage: "tag").tag(CollectionFilter.tag(tag))
-                        }
-                    }
-                }
-                Menu("Add Collection") {
-                    Button("New Folder…") { begin(.newFolder) }
-                    Button("New List…") { begin(.newList(currentFolder)) }
-                }
-                .padding(8)
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            if filter == nil {
+                overview
+            } else {
+                tasks
             }
-            .frame(minWidth: 160, idealWidth: 190, maxWidth: 280)
-            VStack(alignment: .leading) {
-                HStack {
-                    Button("New Task", systemImage: "plus", action: newTask)
-                    CalendarDrawerButton(store: store, items: selection)
-                        .disabled(selection.isEmpty)
-                    Button("Merge", action: merge).disabled(selection.count < 2)
-                }
-                .padding(.horizontal)
-                List(visible, selection: $selected) { item in
-                    Text(item.title).tag(item.id)
-                }
-                .contextMenu(forSelectionType: UUID.self) { ids in
-                    if ids.count == 1, let item = visible.first(where: { ids.contains($0.id) }) {
-                        Button("Edit Task") { onEdit(item) }
-                    }
-                } primaryAction: { ids in
-                    if ids.count == 1, let item = visible.first(where: { ids.contains($0.id) }) {
-                        onEdit(item)
-                    }
-                }
-            }
-            .frame(minWidth: 300)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .textBackgroundColor))
         .onChange(of: filter) { selected.removeAll() }
+        .onChange(of: section) { filter = nil }
+        .onChange(of: initialListID) {
+            if let initialListID { filter = .list(initialListID) }
+        }
+        .onChange(of: newCollectionSignal) {
+            if filter != nil {
+                newTask()
+            } else {
+                begin(section == .tags ? .newTag : .newList(nil))
+            }
+        }
         .sheet(isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } })) {
             if let editing {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(editing.title).font(.headline)
+                    if case .newList(nil) = editing {
+                        Button("Create a Folder Instead") { begin(.newFolder) }.buttonStyle(.link)
+                    } else if case .newFolder = editing {
+                        Button("Create a List Instead") { begin(.newList(nil)) }.buttonStyle(.link)
+                    }
                     TextField("Name", text: $name)
                     HStack {
                         Spacer()
-                        Button("Cancel") { self.editing = nil }
-                            .keyboardShortcut(.cancelAction)
+                        Button("Cancel") { self.editing = nil }.keyboardShortcut(.cancelAction)
                         Button("Save") { save(editing) }
                             .keyboardShortcut(.defaultAction)
                             .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -153,23 +158,134 @@ struct OrganizationView: View {
         } message: { Text(mergeError ?? "") }
     }
 
-    private var currentFolder: UUID? {
+    private var header: some View {
+        HStack(spacing: 12) {
+            if filter != nil {
+                Button { filter = nil } label: {
+                    Image(systemName: "chevron.left")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back to " + section.title)
+            }
+            Image(systemName: section == .lists ? "list.bullet" : "tag.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(section == .lists ? Color.cyan : Color(red: 41 / 255, green: 183 / 255, blue: 52 / 255))
+            Text(pageTitle).font(.system(size: 24, weight: .bold))
+            Spacer()
+            Button(action: onSearch) { Image(systemName: "magnifyingglass") }
+                .font(.system(size: 17))
+                .buttonStyle(.plain)
+                .accessibilityLabel("Search")
+        }
+        .padding(.leading, 44)
+        .padding(.trailing, 56)
+        .padding(.top, 30)
+        .padding(.bottom, 18)
+    }
+
+    private var pageTitle: String {
         switch filter {
-        case .folder(let id): id
-        case .list(let id): store.lists.first { $0.id == id }?.folderID
-        default: nil
+        case .folder(let id): store.folders.first { $0.id == id }?.name ?? section.title
+        case .list(let id): store.lists.first { $0.id == id }?.name ?? section.title
+        case .tag(let tag): tag
+        case nil: section.title
         }
     }
 
-    private func listRow(_ list: PlannerList) -> some View {
-        Label(list.name, systemImage: "list.bullet")
-            .tag(CollectionFilter.list(list.id))
+    private var overview: some View {
+        let counts = active.reduce(into: [CollectionFilter: CollectionCount]()) { result, item in
+            if let id = item.listID { result[.list(id), default: CollectionCount()].add(item) }
+            for tag in Set(item.tags.map(PlannerTag.key)) { result[.tag(tag), default: CollectionCount()].add(item) }
+        }
+        return ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                if section == .tags {
+                    ForEach(store.tags.sorted { $0.localizedStandardCompare($1) == .orderedAscending }, id: \.self) { tag in
+                        collectionRow(tag, count: counts[.tag(PlannerTag.key(tag))] ?? CollectionCount()) { filter = .tag(tag) }
+                    }
+                } else {
+                    ForEach(lists(in: nil)) { list in listRow(list, counts: counts) }
+                    if !folders.isEmpty {
+                        Canvas { context, size in
+                            var line = Path()
+                            line.move(to: CGPoint(x: 0, y: 0.5))
+                            line.addLine(to: CGPoint(x: size.width, y: 0.5))
+                            context.stroke(line, with: .color(.secondary.opacity(0.4)),
+                                           style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        }
+                        .frame(height: 1).padding(.vertical, 14)
+                        .accessibilityHidden(true)
+                    }
+                    ForEach(folders) { folder in
+                        Button { filter = .folder(folder.id) } label: {
+                            Label(folder.name, systemImage: "folder")
+                                .font(.system(size: 14, weight: .semibold))
+                                .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button("New List…") { begin(.newList(folder.id)) }
+                            Button("Rename Folder…") { begin(.folder(folder)) }
+                            Button("Move Up") { reorder(folder, by: -1) }.disabled(folders.first?.id == folder.id)
+                            Button("Move Down") { reorder(folder, by: 1) }.disabled(folders.last?.id == folder.id)
+                        }
+                        ForEach(lists(in: folder.id)) { list in listRow(list, counts: counts) }
+                    }
+                }
+            }
+            .padding(.horizontal, 44)
+            .padding(.bottom, 72)
+        }
+    }
+
+    private func collectionRow(_ title: String, count: CollectionCount, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 22) {
+                Circle().strokeBorder(.secondary.opacity(0.65), lineWidth: 1.5).frame(width: 9, height: 9)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                    Text(count.summary).font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, 12)
+            .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var tasks: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !selection.isEmpty {
+                HStack {
+                    CalendarDrawerButton(store: store, items: selection)
+                    Button("Merge", action: merge).disabled(selection.count < 2)
+                }
+                .padding(.horizontal, 44)
+            }
+            List(visible, selection: $selected) { item in
+                Text(item.title).font(.system(size: 15, weight: .semibold)).tag(item.id)
+            }
+            .listStyle(.plain)
+            .contextMenu(forSelectionType: UUID.self) { ids in
+                if ids.count == 1, let item = visible.first(where: { ids.contains($0.id) }) {
+                    Button("Edit Task") { onEdit(item) }
+                }
+            } primaryAction: { ids in
+                if ids.count == 1, let item = visible.first(where: { ids.contains($0.id) }) { onEdit(item) }
+            }
+            .padding(.horizontal, 32)
+        }
+    }
+
+    private func listRow(_ list: PlannerList, counts: [CollectionFilter: CollectionCount]) -> some View {
+        collectionRow(list.name, count: counts[.list(list.id)] ?? CollectionCount()) { filter = .list(list.id) }
             .contextMenu {
                 Button("Rename List…") { begin(.list(list)) }
-                Button("Move Up") { reorder(list, by: -1) }
-                    .disabled(lists(in: list.folderID).first?.id == list.id)
-                Button("Move Down") { reorder(list, by: 1) }
-                    .disabled(lists(in: list.folderID).last?.id == list.id)
+                Button("Move Up") { reorder(list, by: -1) }.disabled(lists(in: list.folderID).first?.id == list.id)
+                Button("Move Down") { reorder(list, by: 1) }.disabled(lists(in: list.folderID).last?.id == list.id)
                 Menu("Move to Folder") {
                     Button("No Folder") { move(list, to: nil) }.disabled(list.folderID == nil)
                     ForEach(folders) { folder in
@@ -208,29 +324,26 @@ struct OrganizationView: View {
         guard !text.isEmpty else { return }
         var folders = store.folders
         var lists = store.lists
-        let saved: CollectionFilter
         switch edit {
+        case .newTag:
+            if store.addTag(text) { editing = nil }
+            return
         case .newFolder:
             let folder = PlannerFolder(name: text, order: (folders.map(\.order).max() ?? -1) + 1)
             folders.append(folder)
-            saved = .folder(folder.id)
         case .newList(let folderID):
             let lastOrder = self.lists(in: folderID).last?.order ?? -1
             let list = PlannerList(name: text, folderID: folderID, order: lastOrder + 1)
             lists.append(list)
-            saved = .list(list.id)
         case .folder(let folder):
             guard let index = folders.firstIndex(where: { $0.id == folder.id }) else { return }
             folders[index].name = text
-            saved = .folder(folder.id)
         case .list(let list):
             guard let index = lists.firstIndex(where: { $0.id == list.id }) else { return }
             lists[index].name = text
-            saved = .list(list.id)
         }
         if store.replaceOrganization(folders: folders, lists: lists) {
             editing = nil
-            filter = saved
         }
     }
 

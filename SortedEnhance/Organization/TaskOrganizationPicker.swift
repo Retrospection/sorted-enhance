@@ -6,8 +6,8 @@ struct TaskOrganizationPicker: View {
     @State private var newTag = ""
 
     private var availableTags: [String] {
-        Set(store.items.filter { !$0.deleted }.flatMap(\.tags))
-            .subtracting(item.tags)
+        let selected = Set(item.tags.map(PlannerTag.key))
+        return store.tags.filter { !selected.contains(PlannerTag.key($0)) }
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 

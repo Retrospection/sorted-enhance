@@ -77,7 +77,7 @@ struct SyncDocument: Codable, Equatable, Sendable {
     }
 
     private typealias Records = [String: [String: [String: Data]]]
-    private static let groupNames = ["items", "folders", "lists"]
+    private static let groupNames = ["items", "folders", "lists", "savedTags"]
 
     private static func records(_ snapshot: PlannerSnapshot) throws -> Records {
         let data = try JSONEncoder().encode(snapshot)

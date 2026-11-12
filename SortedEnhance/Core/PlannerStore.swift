@@ -11,6 +11,17 @@ final class PlannerStore: ObservableObject {
     var items: [PlannerItem] { snapshot.items }
     var folders: [PlannerFolder] { snapshot.folders }
     var lists: [PlannerList] { snapshot.lists }
+    var tags: [String] {
+        var names = Dictionary(uniqueKeysWithValues: snapshot.savedTags.map { ($0.id, $0.name) })
+        for item in items where !item.deleted {
+            for name in item.tags {
+                let key = PlannerTag.key(name)
+                if names[key] == nil { names[key] = name }
+            }
+        }
+        return names.values.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
     var canUndo: Bool { !past.isEmpty }
     var canRedo: Bool { !future.isEmpty }
     var libraryIsReadable: Bool { !readFailed }
@@ -74,6 +85,17 @@ final class PlannerStore: ObservableObject {
     }
 
     @discardableResult
+    func addTag(_ name: String) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let tag = PlannerTag(trimmed)
+        guard !tags.contains(where: { PlannerTag.key($0) == tag.id }) else { return true }
+        var next = snapshot
+        next.savedTags.append(tag)
+        return commit(next)
+    }
+
+    @discardableResult
     func replaceOrganization(folders: [PlannerFolder], lists: [PlannerList]) -> Bool {
         var next = snapshot
         next.folders = folders
@@ -83,12 +105,12 @@ final class PlannerStore: ObservableObject {
 
     @discardableResult
     func restore(_ items: [PlannerItem]) -> Bool {
-        restore(PlannerSnapshot(items: items, folders: folders, lists: lists))
+        restore(PlannerSnapshot(items: items, folders: folders, lists: lists, savedTags: snapshot.savedTags))
     }
 
     @discardableResult
     func restore(_ items: [PlannerItem], folders: [PlannerFolder], lists: [PlannerList]) -> Bool {
-        restore(PlannerSnapshot(items: items, folders: folders, lists: lists))
+        restore(PlannerSnapshot(items: items, folders: folders, lists: lists, savedTags: snapshot.savedTags))
     }
 
     @discardableResult
@@ -100,7 +122,8 @@ final class PlannerStore: ObservableObject {
     func applySyncedSnapshot(_ merged: PlannerSnapshot) -> Bool {
         // Timeline and collection order are explicit record fields. JSON array order
         // can change in transit without representing a remote edit.
-        if Set(merged.items) == Set(items), Set(merged.folders) == Set(folders), Set(merged.lists) == Set(lists) {
+        if Set(merged.items) == Set(items), Set(merged.folders) == Set(folders),
+           Set(merged.lists) == Set(lists), Set(merged.savedTags) == Set(snapshot.savedTags) {
             return true
         }
         guard libraryIsReadable, write(merged) else { return false }

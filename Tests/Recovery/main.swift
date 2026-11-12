@@ -28,12 +28,20 @@ precondition(offline == initial)
 let attachment = PlannerAttachment(name: "payload.bin", data: Data([42, 0, 18]))
 offline.items[0].attachments = [attachment]
 offline.items[0].order = 0
+offline.savedTags += [PlannerTag("Read"), PlannerTag("Today")]
 var renamed = original
 renamed.items[0].title = "Revised"
+renamed.savedTags += [PlannerTag("Work"), PlannerTag("today")]
 _ = try await sync(renamed, first)
 let reconciled = try await sync(offline, second)
 let refreshed = try await sync(renamed, first)
 precondition(reconciled == refreshed)
+precondition(Set(reconciled.savedTags.map(\.id)) == Set(["read", "today", "work"]))
+let tagLibrary = PlannerStore(fileURL: temporary.appending(path: "TagLibrary.json"))
+precondition(tagLibrary.restore(initial))
+var tagsOnly = initial
+tagsOnly.savedTags = reconciled.savedTags
+precondition(tagLibrary.applySyncedSnapshot(tagsOnly) && tagLibrary.tags.count == 3)
 precondition(refreshed.items.count == 1 && refreshed.items[0].title == "Revised")
 precondition(refreshed.items[0].order == 0 && refreshed.items[0].attachments == [attachment])
 

@@ -10,7 +10,7 @@
             buildConfigurationList = AAB2723FF2C8E6D1C298C1E4 /* projectConfigs */;
             developmentRegion = en;
             hasScannedForEncodings = 0;
-            knownRegions = (en, Base);
+            knownRegions = (en, "zh-Hans", Base);
             mainGroup = 4813494D137E1631BBA301D5 /* root */;
             preferredProjectObjectVersion = 77;
             productRefGroup = 0A3E27B8CA818264D75C8D81 /* products */;

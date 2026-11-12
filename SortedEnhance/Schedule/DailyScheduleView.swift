@@ -5,27 +5,31 @@ struct DailyScheduleView: View {
     let onEdit: (PlannerItem) -> Void
     let onNew: (Date) -> Void
     let onDayChange: (Date) -> Void
+    let onSearch: () -> Void
 
     @AppStorage("scheduleDefaultDuration") private var defaultDuration = DayPlanner.standardDuration
     @StateObject private var calendars = SystemCalendarStore()
-    @State private var day: Date
+    @Binding private var day: Date
     @State private var dayInput: String
     @State private var selection: Set<String> = []
     @State private var showOrder = false
     @State private var showCalendars = false
-    @State private var showScheduler = false
+    @State private var showDate = false
+    @Binding private var showScheduler: Bool
     @State private var scheduleSelection: Set<UUID>?
     @State private var eventEditor: EventEditorRequest?
     @State private var notice: String?
 
     init(store: PlannerStore, onEdit: @escaping (PlannerItem) -> Void, onNew: @escaping (Date) -> Void,
-         initialDay: Date = Date(), onDayChange: @escaping (Date) -> Void = { _ in }) {
+         day: Binding<Date>, schedulerPresented: Binding<Bool>, onDayChange: @escaping (Date) -> Void, onSearch: @escaping () -> Void) {
         self.store = store
         self.onEdit = onEdit
         self.onNew = onNew
         self.onDayChange = onDayChange
-        _day = State(initialValue: initialDay)
-        _dayInput = State(initialValue: Self.dateString(initialDay))
+        self.onSearch = onSearch
+        _day = day
+        _showScheduler = schedulerPresented
+        _dayInput = State(initialValue: Self.dateString(day.wrappedValue))
     }
 
     private struct EventEditorRequest: Identifiable {
@@ -93,9 +97,23 @@ struct DailyScheduleView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             navigation
-            actions
+                .padding(.horizontal, 40)
+                .padding(.top, 32)
+            Button { onNew(day) } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("New Task")
+            .accessibilityIdentifier("newScheduleTask")
+            .help("New task on this day")
+            .padding(.leading, 44)
+            .padding(.top, 22)
             if let notice {
                 HStack {
                     Text(notice).foregroundStyle(.secondary)
@@ -103,19 +121,45 @@ struct DailyScheduleView: View {
                     Button("Dismiss") { self.notice = nil }.buttonStyle(.link)
                 }
             }
-            if showOrder { orderList } else { timelineList }
-            if !selectedTasks.isEmpty { batchActions }
+            Group {
+                if showOrder { orderList } else { timelineList }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            if !selectedTasks.isEmpty { batchActions.padding(.horizontal, 40).padding(.vertical, 10) }
         }
-        .padding()
-        .sheet(isPresented: $showScheduler) {
-            ScheduleForm(day: day) { start, end, buffer, duration in
-                let occupied = calendars.events(on: day)
-                    .filter { !$0.isAllDay && $0.end > $0.start }
-                    .map { DateInterval(start: $0.start, end: $0.end) }
-                let result = DayPlanner.plan(items: store.items, from: start, until: end, buffer: buffer, busy: occupied, defaultDuration: duration, selectedIDs: scheduleSelection)
-                store.save(result.changes)
-                notice = result.overflowCount > 0 ? "\(result.overflowCount) tasks did not fit and have no start time." : nil
-                showOrder = false
+        .background(Color(nsColor: .textBackgroundColor))
+        .overlay {
+            if !showOrder && timeline.isEmpty {
+                PlannerEmptyState(section: .schedule)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("emptySchedule")
+                    .offset(y: -75)
+                    .allowsHitTesting(false)
+            }
+        }
+        .disabled(showScheduler)
+        .accessibilityHidden(showScheduler)
+        .overlay {
+            if showScheduler {
+                ZStack {
+                    Color(nsColor: .textBackgroundColor).opacity(0.8)
+                        .contentShape(Rectangle())
+                        .onTapGesture { showScheduler = false }
+                        .accessibilityHidden(true)
+                    ScheduleForm(day: day, cancel: { showScheduler = false }) { start, end, buffer, duration in
+                        let occupied = calendars.events(on: day)
+                            .filter { !$0.isAllDay && $0.end > $0.start }
+                            .map { DateInterval(start: $0.start, end: $0.end) }
+                        let result = DayPlanner.plan(items: store.items, from: start, until: end, buffer: buffer,
+                                                     busy: occupied, defaultDuration: duration, selectedIDs: scheduleSelection)
+                        store.save(result.changes)
+                        notice = result.overflowCount > 0 ? "\(result.overflowCount) tasks did not fit and have no start time." : nil
+                        showOrder = false
+                        showScheduler = false
+                    }
+                    .padding(.horizontal, 12)
+                }
             }
         }
         .sheet(item: $eventEditor) { request in
@@ -130,42 +174,97 @@ struct DailyScheduleView: View {
     }
 
     private var navigation: some View {
-        HStack {
-            Button { navigate(-1) } label: { Image(systemName: "chevron.left") }.accessibilityLabel("Previous day")
-            Button("Today") { day = Calendar.current.startOfDay(for: Date()) }
-            Button { navigate(1) } label: { Image(systemName: "chevron.right") }.accessibilityLabel("Next day")
-            TextField("Schedule date", text: $dayInput)
-                .frame(width: 100)
-                .onSubmit {
-                    if let date = Self.dateFormatter.date(from: dayInput), Self.dateString(date) == dayInput {
-                        day = date
-                    } else {
-                        notice = "Enter a date in YYYY-MM-DD format."
-                    }
+        HStack(spacing: 14) {
+            Button {
+                dayInput = Self.dateString(day)
+                showDate.toggle()
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 23, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                    Text(dayHeading)
+                        .font(.system(size: 24, weight: .bold))
+                    Text(dateCaption)
+                        .font(.system(size: 19))
+                        .foregroundStyle(.secondary)
                 }
-            Text(Self.dateString(day)).font(.headline)
-            Spacer()
-            Button("Calendars", systemImage: "calendar") { showCalendars.toggle() }
-                .popover(isPresented: $showCalendars) { CalendarSourcesView(store: calendars) }
+                .lineLimit(1)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Schedule date")
+            .accessibilityValue(Self.dateString(day))
+            .accessibilityIdentifier("scheduleDatePicker")
+            .popover(isPresented: $showDate) { datePicker }
+            Spacer(minLength: 8)
+            Button(action: onSearch) { Image(systemName: "magnifyingglass") }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Search")
+                .help("Search")
+            Menu {
+                Button("New Event") { eventEditor = EventEditorRequest() }
+                Button("Auto Schedule") {
+                    scheduleSelection = nil
+                    showScheduler = true
+                }
+                Button("Calendars") { showCalendars = true }
+                Divider()
+                Picker("View", selection: $showOrder) {
+                    Text("Timeline").tag(false)
+                    Text("Task Order").tag(true)
+                }
+                Divider()
+                Button("Previous day") { navigate(-1) }.keyboardShortcut(.leftArrow, modifiers: .command)
+                Button("Today") { day = Calendar.current.startOfDay(for: Date()) }
+                Button("Next day") { navigate(1) }.keyboardShortcut(.rightArrow, modifiers: .command)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .frame(width: 28, height: 28)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .accessibilityLabel("Schedule options")
+            .accessibilityIdentifier("scheduleOptions")
+            .popover(isPresented: $showCalendars) { CalendarSourcesView(store: calendars) }
         }
+        .font(.system(size: 18))
+        .frame(height: 36)
     }
 
-    private var actions: some View {
-        HStack {
-            Button("New Task", systemImage: "plus") { onNew(day) }
-            Button("New Event") { eventEditor = EventEditorRequest() }
-            Button("Auto Schedule") {
-                scheduleSelection = nil
-                showScheduler = true
-            }
-            .help("Schedule all movable tasks on this day")
-            Spacer()
-            Picker("View", selection: $showOrder) {
-                Text("Timeline").tag(false)
-                Text("Task Order").tag(true)
-            }
-            .labelsHidden().pickerStyle(.segmented).fixedSize()
+    private var dayHeading: String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(day) { return String(localized: "Today") }
+        if calendar.isDateInTomorrow(day) { return String(localized: "Tomorrow") }
+        if calendar.isDateInYesterday(day) { return String(localized: "Yesterday") }
+        return day.formatted(.dateTime.weekday(.wide))
+    }
+
+    private var dateCaption: String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(day) || calendar.isDateInTomorrow(day) || calendar.isDateInYesterday(day) {
+            return day.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
         }
+        return day.formatted(.dateTime.month(.abbreviated).day())
+    }
+
+    private var datePicker: some View {
+        VStack(spacing: 10) {
+            DatePicker("Choose a day", selection: $day, displayedComponents: .date)
+                .datePickerStyle(.graphical)
+            TextField("Schedule date", text: $dayInput)
+                .accessibilityIdentifier("scheduleDateInput")
+                .onSubmit {
+                    guard let date = Self.dateFormatter.date(from: dayInput), Self.dateString(date) == dayInput else {
+                        notice = "Enter a date in YYYY-MM-DD format."
+                        return
+                    }
+                    day = date
+                    showDate = false
+                }
+            Button("Today") { day = Calendar.current.startOfDay(for: Date()); showDate = false }
+        }
+        .padding()
     }
 
     private var timelineList: some View {
@@ -177,28 +276,37 @@ struct DailyScheduleView: View {
                         Text(gap > 0 ? "\(gap) min free" : "\(-gap) min overlap")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    HStack {
-                        if let start = row.entry.start {
-                            Text(start, format: .dateTime.hour().minute()).monospacedDigit()
-                        }
+                    HStack(spacing: 12) {
+                        Text(row.entry.start.map { $0.formatted(.dateTime.hour().minute()) } ?? "")
+                            .font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
+                            .frame(minWidth: 54, alignment: .trailing)
                         switch row.entry {
                         case .task(let item):
-                            if item.locked { Image(systemName: "lock.fill").accessibilityLabel("Locked") }
-                            Text(item.title).strikethrough(item.status != .active)
-                            if item.status != .active {
-                                Text(item.status == .completed ? "Completed" : "Canceled").font(.caption)
+                            Image(systemName: statusSymbol(for: item))
+                                .foregroundStyle(item.status == .active ? Color.secondary : .accentColor)
+                                .accessibilityLabel(item.status.rawValue.localizedCapitalized)
+                            Text(item.title)
+                                .strikethrough(item.status != .active)
+                            if item.locked {
+                                Image(systemName: "lock.fill")
+                                    .font(.caption2).foregroundStyle(.secondary)
+                                    .accessibilityLabel("Locked")
                             }
                             Spacer()
-                            Text("\(DayPlanner.occupiedMinutes(item, defaultDuration: defaultDuration)) min").foregroundStyle(.secondary)
+                            Text("\(DayPlanner.occupiedMinutes(item, defaultDuration: defaultDuration)) min")
+                                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                         case .event(let event):
-                            Image(systemName: "calendar")
+                            Image(systemName: "calendar").foregroundStyle(Color.accentColor)
                             Text(event.title)
                             Spacer()
                             Text(event.isAllDay ? "All day" : "\(Int(event.end.timeIntervalSince(event.start) / 60)) min")
-                                .foregroundStyle(.secondary)
+                                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                         }
                     }
+                    .font(.system(size: 15))
+                    .padding(.vertical, 5)
                 }
+                .listRowInsets(.init(top: 2, leading: 28, bottom: 2, trailing: 40))
                 .contentShape(Rectangle())
                 .tag(row.entry.id)
                 .onTapGesture(count: 2) { edit(row.entry) }
@@ -206,7 +314,6 @@ struct DailyScheduleView: View {
                 .accessibilityAction { edit(row.entry) }
             }
         }
-        .overlay { if rows.isEmpty { Text("No scheduled items").foregroundStyle(.secondary) } }
         .simultaneousGesture(MagnifyGesture().onEnded { gesture in
             guard selectedTasks.count > 1 else { return }
             let scale = gesture.magnification
@@ -272,6 +379,14 @@ struct DailyScheduleView: View {
                 }
                 .fixedSize()
             }
+        }
+    }
+
+    private func statusSymbol(for item: PlannerItem) -> String {
+        switch item.status {
+        case .active: "circle"
+        case .completed: "checkmark.circle.fill"
+        case .canceled: "xmark.circle"
         }
     }
 

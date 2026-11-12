@@ -57,7 +57,7 @@ final class PlannerWorkflowTests: XCTestCase {
 
     func testReplanAroundFixedEventAndPreserveCompletedWorkAfterRelaunch() {
         checkReplanning { meeting in
-            button("New Event").click()
+            chooseScheduleOption("New Event")
             let calendars = app.popUpButtons["Calendar"]
             calendars.click()
             let testCalendar = app.menuItems["Sorted Enhance UI Tests"]
@@ -72,7 +72,7 @@ final class PlannerWorkflowTests: XCTestCase {
 
     func testReplanAroundLockedTaskAndPreserveCompletedWorkAfterRelaunch() {
         checkReplanning { fixedTask in
-            button("New Task").click()
+            button("newScheduleTask").click()
             fill("Title", with: fixedTask)
             fill("Start time", with: "14:00")
             fill("Duration", with: "60")
@@ -116,12 +116,12 @@ final class PlannerWorkflowTests: XCTestCase {
         app.launch()
         navigate("Schedule")
         _ = selectEmptyDay()
-        button("Auto Schedule").click()
+        chooseScheduleOption("Auto Schedule")
         guard let original = field("Buffer").value as? String else {
             XCTFail("Could not read the existing buffer.")
             return
         }
-        let updated = original == "7" ? "8" : "7"
+        let updated = original == "0:07" ? "0:08" : "0:07"
         fill("Buffer", with: updated)
         button("Apply").click()
         addTeardownBlock { @MainActor in
@@ -129,27 +129,53 @@ final class PlannerWorkflowTests: XCTestCase {
             self.app.launch()
             self.navigate("Schedule")
             _ = self.selectEmptyDay()
-            self.button("Auto Schedule").click()
+            self.chooseScheduleOption("Auto Schedule")
             self.fill("Buffer", with: original)
             self.button("Apply").click()
         }
 
-        button("Auto Schedule").click()
+        chooseScheduleOption("Auto Schedule")
         XCTAssertEqual(field("Buffer").value as? String, updated)
         fill("Buffer", with: "3")
-        button("Cancel").click()
+        app.typeKey(.escape, modifierFlags: [])
         app.terminate()
         app.launch()
         navigate("Schedule")
-        button("Auto Schedule").click()
+        chooseScheduleOption("Auto Schedule")
         XCTAssertEqual(field("Buffer").value as? String, updated)
-        button("Cancel").click()
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
+    func testScheduleDaySelectionUpdatesSidebarAndHeader() {
+        app.launch()
+        navigate("Schedule")
+        let calendar = Calendar(identifier: .gregorian)
+        let month = calendar.dateComponents([.year, .month], from: Date())
+        let first = String(format: "%04d-%02d-01", month.year!, month.month!)
+        let second = String(format: "%04d-%02d-02", month.year!, month.month!)
+        showDay(first)
+        let firstButton = app.buttons["SidebarDay-" + first]
+        XCTAssertTrue(firstButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(firstButton.isSelected)
+        app.buttons["SidebarDay-" + second].click()
+        XCTAssertEqual(button("scheduleDatePicker").value as? String, second)
+    }
+
+    private func chooseScheduleOption(_ name: String) {
+        let menu = app.descendants(matching: .any).matching(identifier: "scheduleOptions").firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 3), app.debugDescription)
+        menu.click()
+        let command = app.menuItems[name]
+        XCTAssertTrue(command.waitForExistence(timeout: 3), app.debugDescription)
+        command.click()
     }
 
     private func showDay(_ day: String) {
-        fill("Schedule date", with: day)
+        let picker = button("scheduleDatePicker")
+        picker.click()
+        fill("scheduleDateInput", with: day)
         app.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(app.staticTexts[day].waitForExistence(timeout: 3))
+        XCTAssertEqual(picker.value as? String, day)
     }
 
     private func selectEmptyDay() -> String {
@@ -163,7 +189,7 @@ final class PlannerWorkflowTests: XCTestCase {
             let date = calendar.date(byAdding: .day, value: offset, to: today)!
             let day = formatter.string(from: date)
             showDay(day)
-            if app.staticTexts["No scheduled items"].waitForExistence(timeout: 1) {
+            if app.descendants(matching: .any).matching(identifier: "emptySchedule").firstMatch.waitForExistence(timeout: 1) {
                 return day
             }
         }
@@ -208,7 +234,12 @@ final class PlannerWorkflowTests: XCTestCase {
 
     @discardableResult
     private func createTask(title: String = "Task " + UUID().uuidString, duration: Int? = nil) -> String {
-        button("New Task").click()
+        let scheduleAdd = app.buttons["newScheduleTask"]
+        if scheduleAdd.exists {
+            scheduleAdd.click()
+        } else {
+            button("New Task").click()
+        }
         fill("Title", with: title)
         if let duration {
             fill("Duration", with: String(duration))
@@ -248,7 +279,7 @@ final class PlannerWorkflowTests: XCTestCase {
     }
 
     private func schedule(from time: String) {
-        button("Auto Schedule").click()
+        chooseScheduleOption("Auto Schedule")
         fill("Schedule from", with: time)
         fill("Buffer", with: "0")
         button("Apply").click()

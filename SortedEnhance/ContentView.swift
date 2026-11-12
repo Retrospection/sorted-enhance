@@ -1,48 +1,32 @@
 import SwiftUI
 import AppKit
 
-private enum PlannerSection: String, CaseIterable, Identifiable {
-    case inbox = "Inbox"
-    case schedule = "Schedule"
-    case collections = "Lists & Tags"
-    case history = "History"
-    case trash = "Trash"
-
-    var id: Self { self }
-
-    var symbol: String {
-        switch self {
-        case .inbox: "tray"
-        case .schedule: "calendar"
-        case .collections: "folder"
-        case .history: "clock.arrow.circlepath"
-        case .trash: "trash"
-        }
-    }
-}
-
 struct ContentView: View {
     @ObservedObject var store: PlannerStore
-    @State private var section: PlannerSection? = .inbox
+    @State private var section: PlannerSection = .schedule
     @State private var search = ""
     @State private var editing: PlannerItem?
     @State private var quickCapture = false
     @State private var listToShow: UUID?
     @State private var listNavigation = UUID()
     @State private var scheduleDay = Date.now
-    @State private var scheduleNavigation = UUID()
+    @State private var schedulerPresented = false
+    @State private var searching = false
+    @State private var collectionRequest = 0
+    @State private var helpPresented = false
+    @Environment(\.openSettings) private var openSettings
     @StateObject private var calendars = SystemCalendarStore()
     @State private var eventToEdit: PlannerCalendarEvent?
     @State private var searchEvents: [PlannerCalendarEvent] = []
     @State private var selectedTask: UUID?
     @Environment(\.scenePhase) private var phase
 
-    private var isSearching: Bool { !search.isEmpty }
+    private var isSearching: Bool { searching }
 
     private var visibleItems: [PlannerItem] {
         store.items.filter { item in
             if isSearching {
-                return !item.deleted && ([item.title, item.notes] + item.tags)
+                return !search.isEmpty && !item.deleted && ([item.title, item.notes] + item.tags)
                     .contains { $0.localizedCaseInsensitiveContains(search) }
             }
             switch section {
@@ -54,27 +38,60 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(PlannerSection.allCases, selection: $section) { destination in
-                Label(destination.rawValue, systemImage: destination.symbol)
-                    .accessibilityIdentifier(destination.rawValue)
-                    .tag(destination)
-            }
-            .navigationSplitViewColumnWidth(min: 160, ideal: 195)
-        } detail: {
-            detail
-                .navigationTitle(isSearching ? "Search" : section?.rawValue ?? "Inbox")
-                .toolbar {
-                    if section != .schedule || isSearching {
-                        Button("New Task", systemImage: "plus") { editing = PlannerItem(title: "") }
-                            .keyboardShortcut("n", modifiers: [.command, .shift])
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                PlannerSidebar(section: Binding(get: { section }, set: { destination in
+                    listToShow = nil
+                    listNavigation = UUID()
+                    section = destination
+                }), day: $scheduleDay, onSettings: { openSettings() },
+                               onHelp: { helpPresented = true })
+                    .frame(width: min(300, max(200, geometry.size.width * 0.293)))
+                    .overlay {
+                        if schedulerPresented {
+                            Color(nsColor: .textBackgroundColor).opacity(0.8)
+                                .onTapGesture { schedulerPresented = false }
+                        }
                     }
-                    Button("Quick Capture", systemImage: "bolt") { quickCapture = true }
-                        .keyboardShortcut("k", modifiers: .command)
+                ZStack(alignment: .bottomTrailing) {
+                    Color(nsColor: .textBackgroundColor)
+                    detail
+                    if !searching && !schedulerPresented && section != .history && section != .trash {
+                        Button(action: createInSection) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 23, weight: .semibold))
+                                .frame(width: 46, height: 46)
+                                .foregroundStyle(.white)
+                                .background(section.tint, in: Circle())
+                                .shadow(color: .black.opacity(0.14), radius: 2, y: 1)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(section == .lists ? "New List" : section == .tags ? "New Tag" : "New Task")
+                        .accessibilityIdentifier(section == .schedule ? "ScheduleAddButton" : section == .lists ? "New List" : section == .tags ? "New Tag" : "New Task")
+                        .padding(24)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
-        .searchable(text: $search, placement: .toolbar, prompt: "Search tasks and events")
-        .onChange(of: section) { search = "" }
+        .tint(section.tint)
+        .ignoresSafeArea(.container, edges: .top)
+        .focusedSceneValue(\.plannerSearch, { startSearch() })
+        .focusedSceneValue(\.plannerCreate, { createInSection() })
+        .focusedSceneValue(\.plannerQuickCapture, { quickCapture = true })
+        .onChange(of: section) { _, _ in
+            finishSearch()
+            schedulerPresented = false
+        }
+        .sheet(isPresented: $helpPresented) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Keyboard Shortcuts").font(.title2.bold())
+                LabeledContent("Search", value: "⌘F")
+                LabeledContent("New item", value: "⇧⌘N")
+                LabeledContent("Quick Capture", value: "⌘K")
+                Button("Done") { helpPresented = false }.keyboardShortcut(.cancelAction)
+            }.padding(24).frame(width: 300)
+        }
         .onChange(of: search) { searchEvents = calendars.search(search) }
         .onReceive(calendars.$calendars.receive(on: RunLoop.main)) { _ in searchEvents = calendars.search(search) }
         .sheet(item: $eventToEdit) { event in
@@ -112,15 +129,51 @@ struct ContentView: View {
                 var item = PlannerItem(title: "")
                 item.day = day
                 editing = item
-            }, initialDay: scheduleDay, onDayChange: { day in
-                scheduleDay = day
-                materialize(through: day)
-            })
-            .id(scheduleNavigation)
-        } else if section == .collections && !isSearching {
-            OrganizationView(store: store, onEdit: { editing = $0 }, initialListID: listToShow)
+            }, day: $scheduleDay, schedulerPresented: $schedulerPresented,
+               onDayChange: { materialize(through: $0) }, onSearch: startSearch)
+        } else if (section == .lists || section == .tags) && !isSearching {
+            OrganizationView(store: store, section: section == .lists ? .lists : .tags,
+                             onEdit: { editing = $0 }, onSearch: startSearch,
+                             newCollectionSignal: collectionRequest, initialListID: listToShow)
                 .id(listNavigation)
         } else {
+            VStack(alignment: .leading, spacing: 0) {
+                if isSearching {
+                    HStack(spacing: 12) {
+                        PlannerSearchField(text: $search)
+                        Button("Done", action: finishSearch).keyboardShortcut(.cancelAction)
+                    }
+                    .padding(.horizontal, 40).padding(.top, 37).padding(.bottom, 14)
+                } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: section.systemImage).foregroundStyle(section.tint)
+                        Text(section.label).fontWeight(.bold)
+                        Spacer()
+                        Button(action: startSearch) { Image(systemName: "magnifyingglass") }
+                            .accessibilityLabel("Search")
+                        Menu {
+                            Button("New Task") { editing = PlannerItem(title: "") }
+                            Button("Quick Capture") { quickCapture = true }
+                        } label: { Image(systemName: "ellipsis") }
+                        .menuIndicator(.hidden).fixedSize()
+                        .accessibilityLabel("More actions")
+                    }
+                    .font(.system(size: 24))
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 44).padding(.top, 38).padding(.bottom, 20)
+                }
+                if visibleItems.isEmpty && !isSearching {
+                    PlannerEmptyState(section: section)
+                        .padding(.bottom, 180)
+                } else {
+                    taskList
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private var taskList: some View {
             List(selection: $selectedTask) {
                 ForEach(visibleItems) { item in
                     HStack {
@@ -156,21 +209,28 @@ struct ContentView: View {
                 editing = item
                 return .handled
             }
-            .overlay {
-                if visibleItems.isEmpty && !isSearching {
-                    ContentUnavailableView(section?.rawValue ?? "Inbox",
-                                           systemImage: section?.symbol ?? "tray",
-                                           description: Text(emptyMessage))
-                }
-            }
-        }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .padding(.horizontal, 32)
     }
 
-    private var emptyMessage: String {
-        switch section {
-        case .history: "Completed and canceled tasks appear here."
-        case .trash: "Deleted tasks appear here."
-        default: "Create a task to add it to your inbox."
+    private func startSearch() {
+        schedulerPresented = false
+        searching = true
+    }
+
+    private func finishSearch() {
+        searching = false
+        search = ""
+    }
+
+    private func createInSection() {
+        if !searching && (section == .lists || section == .tags) {
+            collectionRequest += 1
+        } else {
+            var item = PlannerItem(title: "")
+            if !searching && section == .schedule { item.day = scheduleDay }
+            editing = item
         }
     }
 
@@ -179,22 +239,21 @@ struct ContentView: View {
         editing = nil
         quickCapture = false
         eventToEdit = nil
-        search = ""
+        finishSearch()
         switch link {
         case .today:
             scheduleDay = .now
-            scheduleNavigation = UUID()
             section = .schedule
         case .date(let day):
             scheduleDay = day
-            scheduleNavigation = UUID()
             section = .schedule
         case .list(let id):
             guard store.lists.contains(where: { $0.id == id }) else { return }
             listToShow = id
             listNavigation = UUID()
-            section = .collections
+            section = .lists
         case .search(let query):
+            searching = true
             search = query
         case .item(let id):
             if !store.items.contains(where: { $0.id == id }) { materialize(through: .now) }

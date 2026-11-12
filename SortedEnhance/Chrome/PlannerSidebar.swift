@@ -61,12 +61,13 @@ struct PlannerSidebar: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let compact = geometry.size.height < 754
             VStack(spacing: 0) {
                 ScrollView(.vertical) {
                     VStack(spacing: 0) {
-                        monthCalendar
+                        monthCalendar(compact: compact)
                         divider
-                        navigation
+                        navigation(compact: compact)
                     }
                 }
                 .scrollIndicators(.hidden)
@@ -81,7 +82,7 @@ struct PlannerSidebar: View {
         }
     }
 
-    private var monthCalendar: some View {
+    private func monthCalendar(compact: Bool) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: locale.language.languageCode?.identifier == "zh" ? 0 : 4) {
@@ -125,7 +126,7 @@ struct PlannerSidebar: View {
             }
             Spacer(minLength: 0)
         }
-        .frame(height: 365)
+        .frame(height: compact ? 316 : 365)
     }
 
     private func monthButton(by offset: Int) -> some View {
@@ -208,7 +209,7 @@ struct PlannerSidebar: View {
         Rectangle().fill(.white.opacity(0.12)).frame(height: 1)
     }
 
-    private var navigation: some View {
+    private func navigation(compact: Bool) -> some View {
         VStack(spacing: 0) {
             ForEach(PlannerSection.allCases) { destination in
                 if destination == .history {
@@ -246,7 +247,7 @@ struct PlannerSidebar: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 20)
-                .frame(height: 53)
+                .frame(height: compact ? 44 : 53)
                 .accessibilityIdentifier(destination.accessibilityID)
                 .accessibilityAddTraits(section == destination ? .isSelected : [])
             }

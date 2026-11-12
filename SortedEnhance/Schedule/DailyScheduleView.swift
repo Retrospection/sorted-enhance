@@ -136,8 +136,25 @@ struct DailyScheduleView: View {
                     .allowsHitTesting(false)
             }
         }
-        .disabled(showScheduler)
-        .accessibilityHidden(showScheduler)
+        .disabled(showScheduler || showDate)
+        .accessibilityHidden(showScheduler || showDate)
+        .overlay(alignment: .topLeading) {
+            if showDate {
+                ZStack(alignment: .topLeading) {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { showDate = false }
+                        .accessibilityHidden(true)
+                    datePicker
+                        .frame(width: 260)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                        .shadow(color: .black.opacity(0.18), radius: 10, y: 3)
+                        .padding(.top, 72)
+                        .padding(.leading, 40)
+                        .onExitCommand { showDate = false }
+                }
+            }
+        }
         .overlay {
             if showScheduler {
                 ZStack {
@@ -194,7 +211,6 @@ struct DailyScheduleView: View {
             .accessibilityLabel("Schedule date")
             .accessibilityValue(Self.dateString(day))
             .accessibilityIdentifier("scheduleDatePicker")
-            .popover(isPresented: $showDate) { datePicker }
             Spacer(minLength: 8)
             Button(action: onSearch) {
                 Image(systemName: "magnifyingglass")
@@ -271,6 +287,8 @@ struct DailyScheduleView: View {
             DatePicker("Choose a day", selection: $day, displayedComponents: .date)
                 .datePickerStyle(.graphical)
             TextField("Schedule date", text: $dayInput)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Schedule date")
                 .accessibilityIdentifier("scheduleDateInput")
                 .onSubmit {
                     guard let date = Self.dateFormatter.date(from: dayInput), Self.dateString(date) == dayInput else {
@@ -295,7 +313,13 @@ struct DailyScheduleView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     HStack(spacing: 12) {
-                        Text(row.entry.start.map { $0.formatted(.dateTime.hour().minute()) } ?? "")
+                        Group {
+                            if let start = row.entry.start {
+                                Text(start, format: .dateTime.hour().minute())
+                            } else {
+                                Text(verbatim: "")
+                            }
+                        }
                             .font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
                             .frame(minWidth: 54, alignment: .trailing)
                         switch row.entry {

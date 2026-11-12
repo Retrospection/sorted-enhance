@@ -35,6 +35,7 @@ final class PlannerWorkflowTests: XCTestCase {
         XCTAssertFalse(task(title).exists)
 
         navigate("Trash")
+        XCTAssertTrue(app.buttons["Trash"].isSelected, "Trash must be selected before opening a deleted task.")
         openTask(title)
         button("Restore").click()
         navigate("Inbox")

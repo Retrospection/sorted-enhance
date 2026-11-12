@@ -78,6 +78,10 @@ func testReplanAfterMeetingAndRelaunch() {
 
     completed.status = .completed
     precondition(store.save(completed))
+    guard let closure = store.items.first(where: { $0.id == outline.id })?.closedAt else {
+        preconditionFailure("Completing a task must record its closing time.")
+    }
+    completed.closedAt = closure
     let next = DayPlanner.plan(items: store.items, from: date(8, 15, 30), until: date(8, 18),
                                buffer: 0, busy: [meeting], calendar: calendar)
     precondition(store.save(next.changes))

@@ -35,9 +35,17 @@ struct ScheduleForm: View {
     var body: some View {
         Form {
             TextField("Schedule from", text: $from)
+                .accessibilityLabel("Schedule from")
+                .accessibilityIdentifier("Schedule from")
             TextField("Finish by", text: $until)
+                .accessibilityLabel("Finish by")
+                .accessibilityIdentifier("Finish by")
             TextField("Buffer", text: $bufferInput)
+                .accessibilityLabel("Buffer")
+                .accessibilityIdentifier("Buffer")
             TextField("Default duration", text: $durationInput)
+                .accessibilityLabel("Default duration")
+                .accessibilityIdentifier("Default duration")
             HStack {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Apply") {

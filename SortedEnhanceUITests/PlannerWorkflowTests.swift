@@ -52,7 +52,7 @@ final class PlannerWorkflowTests: XCTestCase {
         openTask(title)
         button("Reopen").click()
         navigate("Inbox")
-        XCTAssertTrue(task(title).waitForExistence(timeout: 3))
+        XCTAssertTrue(task(title).waitForExistence(timeout: 3), app.debugDescription)
     }
 
     func testReplanAroundFixedEventAndPreserveCompletedWorkAfterRelaunch() {
@@ -165,7 +165,7 @@ final class PlannerWorkflowTests: XCTestCase {
             fill("Duration", with: String(duration))
         }
         button("Save").click()
-        XCTAssertTrue(task(title).waitForExistence(timeout: 3))
+        XCTAssertTrue(task(title).waitForExistence(timeout: 3), app.debugDescription)
         return title
     }
 

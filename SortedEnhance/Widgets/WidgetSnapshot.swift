@@ -32,10 +32,17 @@ struct WidgetOccurrence: Codable, Hashable {
     let seriesID: UUID
     let index: Int
     let rule: PlannerRecurrence?
+    let ownsRevisionDefaults: Bool?
+    let status: PlannerStatus?
+    let deleted: Bool?
 
     init?(_ item: PlannerItem) {
         guard let seriesID = item.seriesID, let index = item.occurrenceIndex else { return nil }
-        task = WidgetTask(item)
+        // The tasks array holds what is visible for this occurrence. Projection needs its revision baseline.
+        task = WidgetTask(item.revisionDefaults?.applying(to: item) ?? item)
+        ownsRevisionDefaults = item.revisionDefaults == nil ? nil : true
+        status = item.status == .active ? nil : item.status
+        deleted = item.deleted ? true : nil
         self.seriesID = seriesID
         self.index = index
         rule = item.recurrence
@@ -51,6 +58,9 @@ struct WidgetOccurrence: Codable, Hashable {
         item.seriesID = seriesID
         item.occurrenceIndex = index
         item.recurrence = rule
+        item.status = status ?? .active
+        item.deleted = deleted ?? false
+        if ownsRevisionDefaults == true { item.revisionDefaults = PlannerOccurrenceDefaults(item) }
         return item
     }
 }

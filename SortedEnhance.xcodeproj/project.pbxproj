@@ -74,6 +74,7 @@
                 MARKETING_VERSION = 0.1.0;
                 CURRENT_PROJECT_VERSION = 1;
                 CODE_SIGN_IDENTITY = "-";
+                ENABLE_USER_SELECTED_FILES = readonly;
                 ENABLE_APP_SANDBOX = YES;
                 ENABLE_HARDENED_RUNTIME = YES;
                 ENABLE_PREVIEWS = YES;
@@ -90,6 +91,7 @@
                 MARKETING_VERSION = 0.1.0;
                 CURRENT_PROJECT_VERSION = 1;
                 CODE_SIGN_IDENTITY = "-";
+                ENABLE_USER_SELECTED_FILES = readonly;
                 ENABLE_APP_SANDBOX = YES;
                 ENABLE_HARDENED_RUNTIME = YES;
                 ENABLE_PREVIEWS = YES;

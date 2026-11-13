@@ -33,6 +33,10 @@ utc.timeZone = TimeZone(secondsFromGMT: 0)!
 var weekly = PlannerItem(title: "Stand-up")
 weekly.day = utc.startOfDay(for: anchor)
 weekly.start = anchor
+weekly.listID = list.id
+weekly.tags = ["Team"]
+weekly.notes = "Private revision notes"
+weekly.attachments = [PlannerAttachment(name: "Private attachment", data: Data([1, 2, 3]))]
 weekly.recurrence = PlannerRecurrence(frequency: .weekly, anchor: anchor, timeZone: utc.timeZone)
 let members = PlannerRepetition.edit(weekly, original: PlannerItem(title: weekly.title), in: [], scope: .future, now: anchor)
 _ = try WidgetSnapshot.export(PlannerSnapshot(items: members), to: file)
@@ -48,3 +52,34 @@ skipped.status = .canceled
 _ = try WidgetSnapshot.export(PlannerSnapshot(items: members + [skipped]), to: file)
 let afterSkip = try JSONDecoder().decode(WidgetSnapshot.self, from: Data(contentsOf: file))
 precondition(afterSkip.tasks(on: weekTen, calendar: utc).isEmpty)
+
+func readWidget(for items: [PlannerItem]) throws -> WidgetSnapshot {
+    _ = try WidgetSnapshot.export(PlannerSnapshot(items: items, lists: [list]), to: file)
+    let data = try Data(contentsOf: file)
+    let json = String(decoding: data, as: UTF8.self)
+    precondition(!json.contains("Private revision notes") && !json.contains("Private attachment"))
+    return try JSONDecoder().decode(WidgetSnapshot.self, from: data)
+}
+
+var exception = members[0]
+exception.title = "One meeting only"
+exception.start = nil
+exception.listID = nil
+exception.tags = ["Exception"]
+let edited = PlannerRepetition.edit(exception, original: members[0], in: members, scope: .occurrence, now: anchor)
+let exceptions = edited + members.dropFirst()
+let afterEdit = try readWidget(for: exceptions)
+precondition(afterEdit.tasks(on: anchor, calendar: utc) == [WidgetTask(exception)])
+let appProjection = PlannerRepetition.upcoming(in: exceptions, through: weekTen).filter {
+    $0.start == weekTen
+}.map(WidgetTask.init)
+precondition(appProjection.count == 1)
+precondition(afterEdit.tasks(on: weekTen, calendar: utc) == appProjection,
+             "An occurrence-only edit must not change future widget tasks.")
+
+// Legacy series may have no frozen baseline. Select the same surviving member as the app.
+var legacy = exceptions
+legacy[0].revisionDefaults = nil
+legacy[0].deleted = true
+let legacyWidget = try readWidget(for: legacy)
+precondition(legacyWidget.tasks(on: weekTen, calendar: utc) == appProjection)

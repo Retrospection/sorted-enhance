@@ -83,3 +83,15 @@ legacy[0].revisionDefaults = nil
 legacy[0].deleted = true
 let legacyWidget = try readWidget(for: legacy)
 precondition(legacyWidget.tasks(on: weekTen, calendar: utc) == appProjection)
+
+let persistence = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+defer { try? FileManager.default.removeItem(at: persistence) }
+let store = PlannerStore(fileURL: persistence)
+precondition(store.restore(PlannerSnapshot(items: exceptions, lists: [list])))
+var removed = exceptions[0]
+removed.deleted = true
+precondition(store.save(removed) && store.emptyTrash())
+let afterPurge = try readWidget(for: store.items)
+precondition(afterPurge.tasks(on: anchor, calendar: utc).isEmpty)
+precondition(afterPurge.tasks(on: weekTen, calendar: utc) == appProjection,
+             "Empty Trash must preserve the widget baseline of an active revision.")

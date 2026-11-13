@@ -5,6 +5,21 @@ let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UU
 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 defer { try? FileManager.default.removeItem(at: directory) }
 
+var newYork = Calendar(identifier: .gregorian)
+newYork.timeZone = TimeZone(identifier: "America/New_York")!
+let iso = ISO8601DateFormatter()
+let fallBack = iso.date(from: "2026-11-01T12:00:00Z")!
+let secondOccurrence = iso.date(from: "2026-11-01T06:30:37Z")!
+precondition(newYork.date(on: fallBack, at: "01:30", preserving: secondOccurrence) == secondOccurrence,
+             "Unchanged wall time must preserve the second occurrence and its seconds.")
+precondition(newYork.date(on: fallBack, at: "02:15", preserving: secondOccurrence) ==
+             iso.date(from: "2026-11-01T07:15:00Z"))
+let followingDay = iso.date(from: "2026-11-02T12:00:00Z")!
+precondition(newYork.date(on: followingDay, at: "01:30", preserving: secondOccurrence) ==
+             iso.date(from: "2026-11-02T06:30:00Z"))
+let springForward = iso.date(from: "2026-03-08T12:00:00Z")!
+precondition(newYork.date(on: springForward, at: "02:30", preserving: nil) == nil)
+
 func occurrence(_ localID: String, timeZone: String, day: Int = 13, calendarID: String = "work") -> EventAnnotationIdentity {
     let zone = TimeZone(identifier: timeZone)!
     var calendar = Calendar(identifier: .gregorian)

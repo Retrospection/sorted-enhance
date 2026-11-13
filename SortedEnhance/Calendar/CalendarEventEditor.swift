@@ -221,17 +221,11 @@ struct CalendarEventEditor: View {
             }
             end = next
         } else {
-            let components = clock.split(separator: ":", omittingEmptySubsequences: false)
-            guard components.count == 2, let hour = Int(components[0]), let minute = Int(components[1]),
-                  (0...23).contains(hour), (0...59).contains(minute), duration > 0,
-                  let time = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day,
-                                           matchingPolicy: .strict), calendar.isDate(time, inSameDayAs: day)
-            else { throw CalendarEditError.invalidEvent }
-            if let original, !original.isAllDay, calendar.isDate(original.start, equalTo: time, toGranularity: .minute) {
-                start = original.start
-            } else {
-                start = time
+            let originalStart = original.flatMap { $0.isAllDay ? nil : $0.start }
+            guard duration > 0, let time = calendar.date(on: day, at: clock, preserving: originalStart) else {
+                throw CalendarEditError.invalidEvent
             }
+            start = time
             if let original, !original.isAllDay, duration == max(1, Int(original.end.timeIntervalSince(original.start) / 60)) {
                 end = start.addingTimeInterval(original.end.timeIntervalSince(original.start))
             } else {

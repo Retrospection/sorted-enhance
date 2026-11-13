@@ -16,12 +16,12 @@ final class InboxTests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 3))
         field.click()
         field.typeText(title + "\n")
-        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 3), app.debugDescription)
 
         app.terminate()
         app.launch()
         openInbox(in: app)
-        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 3), app.debugDescription)
         XCTAssertEqual(app.staticTexts.matching(identifier: title).count, 1)
     }
 

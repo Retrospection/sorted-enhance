@@ -5,6 +5,8 @@ import UniformTypeIdentifiers
 struct PlannerAttachmentEditor: View {
     @Binding var attachments: [PlannerAttachment]
     @State private var preview: URL?
+    @State private var previewDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("PlannerAttachment-" + UUID().uuidString, isDirectory: true)
     @State private var importing = false
     @State private var errorMessage: String?
 
@@ -21,6 +23,9 @@ struct PlannerAttachmentEditor: View {
                         .buttonStyle(.link)
                     Spacer()
                     Button {
+                        if preview?.deletingLastPathComponent().lastPathComponent == attachment.id.uuidString {
+                            preview = nil
+                        }
                         attachments.removeAll { $0.id == attachment.id }
                     } label: {
                         Image(systemName: "minus.circle")
@@ -30,6 +35,15 @@ struct PlannerAttachmentEditor: View {
             }
         }
         .quickLookPreview($preview)
+        .onChange(of: preview) { previous, current in
+            if let previous, previous != current {
+                try? FileManager.default.removeItem(at: previous)
+            }
+        }
+        .onDisappear {
+            preview = nil
+            try? FileManager.default.removeItem(at: previewDirectory)
+        }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.data], allowsMultipleSelection: true) { result in
             do {
                 let imported = try result.get().map { url in
@@ -51,9 +65,7 @@ struct PlannerAttachmentEditor: View {
 
     private func open(_ attachment: PlannerAttachment) {
         do {
-            let directory = FileManager.default.temporaryDirectory
-                .appendingPathComponent("Attachment Previews", isDirectory: true)
-                .appendingPathComponent(attachment.id.uuidString, isDirectory: true)
+            let directory = previewDirectory.appendingPathComponent(attachment.id.uuidString, isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let filename = (attachment.name as NSString).lastPathComponent
             guard !["", ".", "..", "/"].contains(filename) else { throw CocoaError(.fileReadInvalidFileName) }

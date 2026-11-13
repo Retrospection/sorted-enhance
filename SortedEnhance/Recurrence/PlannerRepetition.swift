@@ -149,6 +149,9 @@ enum PlannerRepetition {
             item.start = template.start == nil ? nil : date
             item.status = .active
             item.deleted = false
+            item.closedAt = nil
+            item.deletedAt = nil
+            item.purged = nil
             return item
         }
     }

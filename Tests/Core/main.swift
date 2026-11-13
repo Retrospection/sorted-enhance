@@ -74,4 +74,37 @@ testBatchUndoRedoAndRelaunch(at: directory.appending(path: "batch.json"))
 try testInvalidBackupPreservesLibrary(at: directory.appending(path: "restore.json"))
 try testRecoverDamagedLibrary(at: directory.appending(path: "damaged.json"))
 try testFailedWritePreservesUndoHistory(at: directory.appending(path: "undo.json"))
-print("All four planner store cases passed.")
+let legacy = directory.appending(path: "old-library.json")
+try Data(#"{"items":[],"folders":[],"lists":[]}"#.utf8).write(to: legacy)
+let tagStore = PlannerStore(fileURL: legacy)
+precondition(tagStore.libraryIsReadable && tagStore.tags.isEmpty)
+var tagged = PlannerItem(title: "Existing task")
+tagged.tags = ["Urgent"]
+precondition(tagStore.save(tagged))
+precondition(tagStore.addTag("  Ideas ") && tagStore.tags == ["Ideas", "Urgent"])
+precondition(!tagStore.addTag("   ") && tagStore.addTag("ideas") && tagStore.addTag("URGENT"))
+precondition(tagStore.undo() && tagStore.tags == ["Urgent"], "A duplicate or blank tag added an undo step.")
+precondition(tagStore.redo() && PlannerStore(fileURL: legacy).tags == ["Ideas", "Urgent"])
+print("All five planner store cases passed.")
+
+let archiveURL = directory.appending(path: "archive.json")
+let archive = PlannerStore(fileURL: archiveURL)
+var old = PlannerItem(title: "Legacy history")
+old.status = .completed
+precondition(archive.restore([old]) && archive.items[0].closedAt == nil)
+old.notes = "Edited note"
+precondition(archive.save(old) && archive.items[0].closedAt == nil, "Editing old records cannot invent a completion date.")
+var active = PlannerItem(title: "Current task")
+precondition(archive.save(active))
+active.status = .canceled
+precondition(archive.save(active) && archive.items.last?.closedAt != nil)
+active.deleted = true
+precondition(archive.save(active))
+let beforePurge = archive.snapshot
+precondition(archive.items.last?.deletedAt != nil)
+precondition(archive.emptyTrash() && archive.items.map(\.id) == [old.id])
+precondition(PlannerStore(fileURL: archiveURL).items.map(\.id) == [old.id])
+precondition(archive.undo() && archive.snapshot == beforePurge)
+active.status = .active
+active.deleted = false
+precondition(archive.save(active) && archive.items.last?.closedAt == nil && archive.items.last?.deletedAt == nil)

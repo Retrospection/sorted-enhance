@@ -81,7 +81,7 @@ struct PlannerOccurrenceDefaults: Codable, Hashable, Sendable {
     let richNotes: Data?
     let attachments: [PlannerAttachment]?
     let hasStartTime: Bool
-    let duration: Int
+    let duration: Int?
     let locked: Bool
     let listID: UUID?
     let tags: [String]

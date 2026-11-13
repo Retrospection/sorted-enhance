@@ -3,13 +3,25 @@ import SwiftUI
 @main
 struct SortedEnhanceApp: App {
     @StateObject private var store = PlannerStore.shared
+    @State private var settingsPresented = false
+
+    private let widgetUpdates = PlannerWidgetUpdates(store: PlannerStore.shared)
+    @StateObject private var recovery = PlannerRecovery(store: PlannerStore.shared)
+
+    init() {
+        PlannerNotifications.shared.observe(PlannerStore.shared)
+    }
 
     var body: some Scene {
-        WindowGroup("Sorted Enhance") {
-            ContentView(store: store)
+        Window("Sorted Enhance", id: "planner") {
+            ContentView(store: store, recovery: recovery, settingsPresented: $settingsPresented)
+                .modifier(PlannerPreferencesModifier())
+                .onAppear { recovery.refresh() }
         }
-        .defaultSize(width: 960, height: 640)
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1024, height: 800)
         .commands {
+            PlannerCommands { settingsPresented = true }
             CommandMenu("Planner") {
                 Button("Undo Planner Change") { store.undo() }
                     .keyboardShortcut("z", modifiers: [.command, .option])

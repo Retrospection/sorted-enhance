@@ -1,0 +1,97 @@
+import Foundation
+
+let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+defer { try? FileManager.default.removeItem(at: file) }
+
+let list = PlannerList(name: "Launch")
+var task = PlannerItem(title: "Review notes")
+task.listID = list.id
+task.tags = ["Work"]
+var hidden = PlannerItem(title: "Discarded")
+hidden.deleted = true
+var library = PlannerSnapshot(items: [task, hidden], lists: [list])
+let firstExport = try WidgetSnapshot.export(library, to: file)
+precondition(firstExport)
+library.items[0].title = "Review release"
+_ = try WidgetSnapshot.export(library, to: file)
+
+let exported = try JSONDecoder().decode(WidgetSnapshot.self, from: Data(contentsOf: file))
+precondition(exported.tasks.map(\.title) == ["Review release"])
+precondition(exported.tasks.first?.listID == list.id && exported.lists.first?.name == "Launch")
+precondition(exported.tasks.first?.tags == ["Work"])
+precondition(exported.tasks.first?.link.absoluteString == "sorted-enhance://item/\(task.id.uuidString)")
+
+library.items[0].status = .completed
+_ = try WidgetSnapshot.export(library, to: file)
+let afterCompletion = try JSONDecoder().decode(WidgetSnapshot.self, from: Data(contentsOf: file))
+precondition(afterCompletion.tasks.isEmpty)
+
+// Keep the exported file fixed while the widget advances beyond the app's last generated week.
+let anchor = ISO8601DateFormatter().date(from: "2026-01-01T10:00:00Z")!
+var utc = Calendar(identifier: .gregorian)
+utc.timeZone = TimeZone(secondsFromGMT: 0)!
+var weekly = PlannerItem(title: "Stand-up")
+weekly.day = utc.startOfDay(for: anchor)
+weekly.start = anchor
+weekly.listID = list.id
+weekly.tags = ["Team"]
+weekly.notes = "Private revision notes"
+weekly.attachments = [PlannerAttachment(name: "Private attachment", data: Data([1, 2, 3]))]
+weekly.recurrence = PlannerRecurrence(frequency: .weekly, anchor: anchor, timeZone: utc.timeZone)
+let members = PlannerRepetition.edit(weekly, original: PlannerItem(title: weekly.title), in: [], scope: .future, now: anchor)
+_ = try WidgetSnapshot.export(PlannerSnapshot(items: members), to: file)
+let frozen = try JSONDecoder().decode(WidgetSnapshot.self, from: Data(contentsOf: file))
+let weekTen = utc.date(byAdding: .weekOfYear, value: 10, to: anchor)!
+let result = frozen.tasks(on: weekTen, calendar: utc)
+precondition(result.count == 1 && result[0].title == "Stand-up" && result[0].start == weekTen)
+let materialized = PlannerRepetition.upcoming(in: members, through: weekTen).first { $0.start == weekTen }!
+precondition(result[0].link.lastPathComponent == materialized.id.uuidString)
+
+var skipped = materialized
+skipped.status = .canceled
+_ = try WidgetSnapshot.export(PlannerSnapshot(items: members + [skipped]), to: file)
+let afterSkip = try JSONDecoder().decode(WidgetSnapshot.self, from: Data(contentsOf: file))
+precondition(afterSkip.tasks(on: weekTen, calendar: utc).isEmpty)
+
+func readWidget(for items: [PlannerItem]) throws -> WidgetSnapshot {
+    _ = try WidgetSnapshot.export(PlannerSnapshot(items: items, lists: [list]), to: file)
+    let data = try Data(contentsOf: file)
+    let json = String(decoding: data, as: UTF8.self)
+    precondition(!json.contains("Private revision notes") && !json.contains("Private attachment"))
+    return try JSONDecoder().decode(WidgetSnapshot.self, from: data)
+}
+
+var exception = members[0]
+exception.title = "One meeting only"
+exception.start = nil
+exception.listID = nil
+exception.tags = ["Exception"]
+let edited = PlannerRepetition.edit(exception, original: members[0], in: members, scope: .occurrence, now: anchor)
+let exceptions = edited + members.dropFirst()
+let afterEdit = try readWidget(for: exceptions)
+precondition(afterEdit.tasks(on: anchor, calendar: utc) == [WidgetTask(exception)])
+let appProjection = PlannerRepetition.upcoming(in: exceptions, through: weekTen).filter {
+    $0.start == weekTen
+}.map(WidgetTask.init)
+precondition(appProjection.count == 1)
+precondition(afterEdit.tasks(on: weekTen, calendar: utc) == appProjection,
+             "An occurrence-only edit must not change future widget tasks.")
+
+// Legacy series may have no frozen baseline. Select the same surviving member as the app.
+var legacy = exceptions
+legacy[0].revisionDefaults = nil
+legacy[0].deleted = true
+let legacyWidget = try readWidget(for: legacy)
+precondition(legacyWidget.tasks(on: weekTen, calendar: utc) == appProjection)
+
+let persistence = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+defer { try? FileManager.default.removeItem(at: persistence) }
+let store = PlannerStore(fileURL: persistence)
+precondition(store.restore(PlannerSnapshot(items: exceptions, lists: [list])))
+var removed = exceptions[0]
+removed.deleted = true
+precondition(store.save(removed) && store.emptyTrash())
+let afterPurge = try readWidget(for: store.items)
+precondition(afterPurge.tasks(on: anchor, calendar: utc).isEmpty)
+precondition(afterPurge.tasks(on: weekTen, calendar: utc) == appProjection,
+             "Empty Trash must preserve the widget baseline of an active revision.")

@@ -18,12 +18,12 @@ task.start = now.addingTimeInterval(900)
 task.reminderOffsetMinutes = 5
 let original = PlannerAlert(task, now: now)!
 precondition(original.date == now.addingTimeInterval(600))
-precondition(original.matches(original.request))
+precondition(original.matches(original.request(sound: .system), sound: .system))
 
 task.start = now.addingTimeInterval(1200)
 let postponed = PlannerAlert(task, now: now)!
 precondition(postponed.identifier == original.identifier)
-precondition(!postponed.matches(original.request))
+precondition(!postponed.matches(original.request(sound: .system), sound: .system))
 precondition(postponed.date == now.addingTimeInterval(900))
 task.status = .completed
 precondition(PlannerAlert(task, now: now) == nil)
@@ -44,9 +44,9 @@ recurring.reminderOffsetMinutes = 15
 let dailyAlerts = PlannerAlert.plan(for: [recurring], now: beforeMonday)
 precondition(dailyAlerts.count == 1)
 let dailyAlert = dailyAlerts[0]
-let dailyTrigger = dailyAlert.request.trigger as! UNCalendarNotificationTrigger
+let dailyTrigger = dailyAlert.request(sound: .system).trigger as! UNCalendarNotificationTrigger
 precondition(dailyTrigger.repeats && dailyTrigger.dateComponents.hour == 9 && dailyTrigger.dateComponents.minute == 45)
-precondition(dailyAlert.matches(dailyAlert.request))
+precondition(dailyAlert.matches(dailyAlert.request(sound: .system), sound: .system))
 
 var skipped = recurring
 skipped.id = UUID()
@@ -88,3 +88,41 @@ retired.deleted = true
 let restarted = PlannerAlert.plan(for: [recurring, retired], now: beforeMonday)
 precondition(restarted.contains { $0.title == "Morning review" && $0.date == monday.addingTimeInterval(16 * 86400 - 900) })
 precondition(!restarted.contains { $0.date == retired.start!.addingTimeInterval(-900) })
+
+let quietRequest = dailyAlert.request(sound: .silent)
+precondition(quietRequest.content.sound == nil)
+precondition(dailyAlert.matches(quietRequest, sound: .silent))
+precondition(!dailyAlert.matches(quietRequest, sound: .system))
+precondition(!dailyAlert.matches(dailyAlert.request(sound: .system), sound: .silent))
+
+let unrelated = UNNotificationRequest(identifier: "another-feature", content: UNMutableNotificationContent(), trigger: nil)
+let pending = [quietRequest, unrelated]
+let disabled = PlannerAlert.changes(for: [], pending: pending, sound: .system, now: beforeMonday)
+precondition(disabled.remove == [dailyAlert.identifier] && disabled.schedule.isEmpty)
+let soundChanged = PlannerAlert.changes(for: [dailyAlert], pending: pending, sound: .system, now: beforeMonday)
+precondition(soundChanged.remove.isEmpty && soundChanged.schedule == [dailyAlert])
+let restored = PlannerAlert.changes(for: [dailyAlert], pending: [unrelated], sound: .silent, now: beforeMonday)
+precondition(restored.remove.isEmpty && restored.schedule == [dailyAlert])
+let unchanged = PlannerAlert.changes(for: [dailyAlert], pending: pending, sound: .silent, now: beforeMonday)
+precondition(unchanged.remove.isEmpty && unchanged.schedule.isEmpty)
+
+var anytime = PlannerItem(title: "Anytime today")
+anytime.day = utc.startOfDay(for: monday)
+var yesterday = PlannerItem(title: "Yesterday")
+yesterday.day = monday.addingTimeInterval(-24 * 3600)
+var earlier = PlannerItem(title: "Earlier today")
+earlier.start = monday.addingTimeInterval(-1)
+var later = PlannerItem(title: "Later today")
+later.start = monday.addingTimeInterval(3600)
+var finished = earlier
+finished.status = .completed
+var trashed = earlier
+trashed.deleted = true
+let badgeItems = [anytime, yesterday, earlier, later, finished, trashed, PlannerItem(title: "Undated")]
+precondition(PlannerBadgeMode.off.count(in: badgeItems, now: monday, calendar: utc) == 0)
+precondition(PlannerBadgeMode.overdue.count(in: badgeItems, now: monday, calendar: utc) == 2)
+precondition(PlannerBadgeMode.overdueAndAnytime.count(in: badgeItems, now: monday, calendar: utc) == 3)
+precondition(PlannerBadgeMode.today.count(in: badgeItems, now: monday, calendar: utc) == 3)
+let tomorrow = monday.addingTimeInterval(24 * 3600)
+precondition(PlannerBadgeMode.overdue.count(in: badgeItems, now: tomorrow, calendar: utc) == 4)
+precondition(PlannerBadgeMode.today.count(in: badgeItems, now: tomorrow, calendar: utc) == 0)

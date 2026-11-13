@@ -10,24 +10,24 @@
             buildConfigurationList = AAB2723FF2C8E6D1C298C1E4 /* projectConfigs */;
             developmentRegion = en;
             hasScannedForEncodings = 0;
-            knownRegions = (en, Base);
+            knownRegions = (en, "zh-Hans", Base);
             mainGroup = 4813494D137E1631BBA301D5 /* root */;
             preferredProjectObjectVersion = 77;
             productRefGroup = 0A3E27B8CA818264D75C8D81 /* products */;
             projectDirPath = "";
             projectRoot = "";
-            targets = (A172CEDCAE47474B615C54D5 /* app */, 000000000000000000000011);
+            targets = (A172CEDCAE47474B615C54D5 /* app */, 534841524500000000000001, 574944474554000000000001, 000000000000000000000011);
         };
-        4813494D137E1631BBA301D5 /* root */ = { isa = PBXGroup; children = (26528A5FC3CFAE9924D0FA33 /* sourceGroup */, 000000000000000000000012, 0A3E27B8CA818264D75C8D81 /* products */); sourceTree = "<group>"; };
+        4813494D137E1631BBA301D5 /* root */ = { isa = PBXGroup; children = (26528A5FC3CFAE9924D0FA33 /* sourceGroup */, 534841524500000000000002, 534841524500000000000003, 574944474554000000000002, 574944474554000000000020, 574944474554000000000021, 574944474554000000000022, 574944474554000000000004, 000000000000000000000012, 0A3E27B8CA818264D75C8D81 /* products */); sourceTree = "<group>"; };
         26528A5FC3CFAE9924D0FA33 /* sourceGroup */ = { isa = PBXFileSystemSynchronizedRootGroup; path = SortedEnhance; sourceTree = "<group>"; };
-        0A3E27B8CA818264D75C8D81 /* products */ = { isa = PBXGroup; children = (A8792157CB4F27FB949C035F /* product */, 000000000000000000000013); name = Products; sourceTree = "<group>"; };
+        0A3E27B8CA818264D75C8D81 /* products */ = { isa = PBXGroup; children = (A8792157CB4F27FB949C035F /* product */, 534841524500000000000004, 574944474554000000000003, 000000000000000000000013); name = Products; sourceTree = "<group>"; };
         A8792157CB4F27FB949C035F /* product */ = { isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SortedEnhance.app; sourceTree = BUILT_PRODUCTS_DIR; };
         A172CEDCAE47474B615C54D5 /* app */ = {
             isa = PBXNativeTarget;
             buildConfigurationList = 952F4DF8105729797025EDD4 /* appConfigs */;
-            buildPhases = (878A52FC5FF6A57D50B7B870 /* sources */, E2AA269EB967A8853A258BFA /* frameworks */, 41D311A605520FC7B8B9A980 /* resources */);
+            buildPhases = (878A52FC5FF6A57D50B7B870 /* sources */, E2AA269EB967A8853A258BFA /* frameworks */, 41D311A605520FC7B8B9A980 /* resources */, 57494447455400000000000E);
             buildRules = ();
-            dependencies = ();
+            dependencies = (57494447455400000000000D, 534841524500000000000005);
             fileSystemSynchronizedGroups = (26528A5FC3CFAE9924D0FA33 /* sourceGroup */);
             name = SortedEnhance;
             productName = SortedEnhance;
@@ -69,12 +69,13 @@
             buildSettings = {
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 PRODUCT_BUNDLE_IDENTIFIER = local.sorted-enhance.SortedEnhance;
+                CODE_SIGN_ENTITLEMENTS = Config/SortedEnhance.entitlements;
+                INFOPLIST_FILE = Config/PlannerInfo.plist;
                 GENERATE_INFOPLIST_FILE = YES;
                 INFOPLIST_KEY_CFBundleDisplayName = "Sorted Enhance";
                 MARKETING_VERSION = 0.1.0;
                 CURRENT_PROJECT_VERSION = 1;
                 CODE_SIGN_IDENTITY = "-";
-                ENABLE_USER_SELECTED_FILES = readonly;
                 ENABLE_APP_SANDBOX = YES;
                 ENABLE_HARDENED_RUNTIME = YES;
                 ENABLE_PREVIEWS = YES;
@@ -86,12 +87,13 @@
             buildSettings = {
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 PRODUCT_BUNDLE_IDENTIFIER = local.sorted-enhance.SortedEnhance;
+                CODE_SIGN_ENTITLEMENTS = Config/SortedEnhance.entitlements;
+                INFOPLIST_FILE = Config/PlannerInfo.plist;
                 GENERATE_INFOPLIST_FILE = YES;
                 INFOPLIST_KEY_CFBundleDisplayName = "Sorted Enhance";
                 MARKETING_VERSION = 0.1.0;
                 CURRENT_PROJECT_VERSION = 1;
                 CODE_SIGN_IDENTITY = "-";
-                ENABLE_USER_SELECTED_FILES = readonly;
                 ENABLE_APP_SANDBOX = YES;
                 ENABLE_HARDENED_RUNTIME = YES;
                 ENABLE_PREVIEWS = YES;
@@ -135,6 +137,137 @@
                 PRODUCT_BUNDLE_IDENTIFIER = local.sorted-enhance.SortedEnhanceUITests;
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 TEST_TARGET_NAME = SortedEnhance;
+            };
+            name = Release;
+        };
+
+        574944474554000000000001 /* PlannerWidgets */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = 574944474554000000000009;
+            buildPhases = (574944474554000000000006, 574944474554000000000008, 574944474554000000000007);
+            buildRules = ();
+            dependencies = ();
+            fileSystemSynchronizedGroups = (574944474554000000000002);
+            name = PlannerWidgets;
+            productName = PlannerWidgets;
+            productReference = 574944474554000000000003;
+            productType = "com.apple.product-type.app-extension";
+        };
+        574944474554000000000002 = { isa = PBXFileSystemSynchronizedRootGroup; path = WidgetExtension; sourceTree = "<group>"; };
+        574944474554000000000003 = { isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; path = PlannerWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+        574944474554000000000004 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortedEnhance/Widgets/WidgetSnapshot.swift; sourceTree = SOURCE_ROOT; };
+        574944474554000000000020 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortedEnhance/Core/PlannerSnapshot.swift; sourceTree = SOURCE_ROOT; };
+        574944474554000000000030 = { isa = PBXBuildFile; fileRef = 574944474554000000000020; };
+        574944474554000000000021 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortedEnhance/Core/PlannerRecurrence.swift; sourceTree = SOURCE_ROOT; };
+        574944474554000000000031 = { isa = PBXBuildFile; fileRef = 574944474554000000000021; };
+        574944474554000000000022 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortedEnhance/Recurrence/PlannerRepetition.swift; sourceTree = SOURCE_ROOT; };
+        574944474554000000000032 = { isa = PBXBuildFile; fileRef = 574944474554000000000022; };
+        574944474554000000000005 = { isa = PBXBuildFile; fileRef = 574944474554000000000004; };
+        574944474554000000000006 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (574944474554000000000005, 574944474554000000000032, 574944474554000000000031, 574944474554000000000030); runOnlyForDeploymentPostprocessing = 0; };
+        574944474554000000000008 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        574944474554000000000007 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        574944474554000000000009 = { isa = XCConfigurationList; buildConfigurations = (57494447455400000000000A, 57494447455400000000000B); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+        57494447455400000000000C = { isa = PBXContainerItemProxy; containerPortal = 244210E48437B6556980A702; proxyType = 1; remoteGlobalIDString = 574944474554000000000001; remoteInfo = PlannerWidgets; };
+        57494447455400000000000D = { isa = PBXTargetDependency; target = 574944474554000000000001; targetProxy = 57494447455400000000000C; };
+        57494447455400000000000E = { isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = ""; dstSubfolderSpec = 13; files = (57494447455400000000000F, 534841524500000000000006); name = "Embed App Extensions"; runOnlyForDeploymentPostprocessing = 0; };
+        57494447455400000000000F = { isa = PBXBuildFile; fileRef = 574944474554000000000003; settings = { ATTRIBUTES = (RemoveHeadersOnCopy); }; };
+
+        57494447455400000000000A = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                APPLICATION_EXTENSION_API_ONLY = YES;
+                CODE_SIGN_ENTITLEMENTS = Config/WidgetExtension.entitlements;
+                CODE_SIGN_IDENTITY = "-";
+                CURRENT_PROJECT_VERSION = 1;
+                ENABLE_APP_SANDBOX = YES;
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_FILE = Config/WidgetInfo.plist;
+                INFOPLIST_KEY_CFBundleDisplayName = "Sorted Enhance Widgets";
+                LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks";
+                MARKETING_VERSION = 0.1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = local.sorted-enhance.SortedEnhance.Widgets;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SKIP_INSTALL = YES;
+            };
+            name = Debug;
+        };
+        57494447455400000000000B = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                APPLICATION_EXTENSION_API_ONLY = YES;
+                CODE_SIGN_ENTITLEMENTS = Config/WidgetExtension.entitlements;
+                CODE_SIGN_IDENTITY = "-";
+                CURRENT_PROJECT_VERSION = 1;
+                ENABLE_APP_SANDBOX = YES;
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_FILE = Config/WidgetInfo.plist;
+                INFOPLIST_KEY_CFBundleDisplayName = "Sorted Enhance Widgets";
+                LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks";
+                MARKETING_VERSION = 0.1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = local.sorted-enhance.SortedEnhance.Widgets;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SKIP_INSTALL = YES;
+            };
+            name = Release;
+        };
+
+        534841524500000000000001 /* PlannerShare */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = 534841524500000000000007;
+            buildPhases = (534841524500000000000008);
+            buildRules = ();
+            dependencies = ();
+            name = PlannerShare;
+            productName = PlannerShare;
+            productReference = 534841524500000000000004;
+            productType = "com.apple.product-type.app-extension";
+        };
+        534841524500000000000002 = { isa = PBXGroup; children = (534841524500000000000009, 53484152450000000000000A, 53484152450000000000000B); path = ShareExtension; sourceTree = "<group>"; };
+        534841524500000000000003 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortedEnhance/Integrations/SharedCapture.swift; sourceTree = SOURCE_ROOT; };
+        534841524500000000000004 = { isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; path = PlannerShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+        534841524500000000000005 = { isa = PBXTargetDependency; target = 534841524500000000000001; targetProxy = 53484152450000000000000C; };
+        534841524500000000000006 = { isa = PBXBuildFile; fileRef = 534841524500000000000004; settings = { ATTRIBUTES = (RemoveHeadersOnCopy); }; };
+        534841524500000000000007 = { isa = XCConfigurationList; buildConfigurations = (53484152450000000000000D, 53484152450000000000000E); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+        534841524500000000000008 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (53484152450000000000000F, 534841524500000000000010); runOnlyForDeploymentPostprocessing = 0; };
+        534841524500000000000009 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+        53484152450000000000000A = { isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+        53484152450000000000000B = { isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Share.entitlements; sourceTree = "<group>"; };
+        53484152450000000000000C = { isa = PBXContainerItemProxy; containerPortal = 244210E48437B6556980A702; proxyType = 1; remoteGlobalIDString = 534841524500000000000001; remoteInfo = PlannerShare; };
+        53484152450000000000000F = { isa = PBXBuildFile; fileRef = 534841524500000000000003; };
+        534841524500000000000010 = { isa = PBXBuildFile; fileRef = 534841524500000000000009; };
+        53484152450000000000000D = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                APPLICATION_EXTENSION_API_ONLY = YES;
+                CODE_SIGN_ENTITLEMENTS = ShareExtension/Share.entitlements;
+                CODE_SIGN_IDENTITY = "-";
+                CURRENT_PROJECT_VERSION = 1;
+                ENABLE_APP_SANDBOX = YES;
+                ENABLE_HARDENED_RUNTIME = YES;
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_FILE = ShareExtension/Info.plist;
+                MARKETING_VERSION = 0.1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = local.sorted-enhance.SortedEnhance.Share;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SKIP_INSTALL = YES;
+            };
+            name = Debug;
+        };
+        53484152450000000000000E = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                APPLICATION_EXTENSION_API_ONLY = YES;
+                CODE_SIGN_ENTITLEMENTS = ShareExtension/Share.entitlements;
+                CODE_SIGN_IDENTITY = "-";
+                CURRENT_PROJECT_VERSION = 1;
+                ENABLE_APP_SANDBOX = YES;
+                ENABLE_HARDENED_RUNTIME = YES;
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_FILE = ShareExtension/Info.plist;
+                MARKETING_VERSION = 0.1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = local.sorted-enhance.SortedEnhance.Share;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SKIP_INSTALL = YES;
             };
             name = Release;
         };
